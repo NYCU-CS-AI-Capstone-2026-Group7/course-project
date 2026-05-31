@@ -170,6 +170,6 @@ class CutleryArrangementEnvCfg(SingleArmFrankaTaskEnvCfg):
             object_roll=OBJECT_ROLL,
             object_pitch=OBJECT_PITCH,
             per_object_yaw_offset=PER_OBJECT_YAW_OFFSET,
-            use_fixed_yaw=True,
+            use_fixed_yaw=False,
             ignored_object_names=IGNORED_OBJECT_NAMES,
         )

@@ -454,8 +454,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
                 _GRIPPER_DOWN_YAW_OFFSET_RANGE[0],
                 _GRIPPER_DOWN_YAW_OFFSET_RANGE[1],
             )
-            if obj_name == _KNIFE_NAME:
-                base_yaw = torch.zeros_like(base_yaw) # fixed direction
+            #if obj_name == _KNIFE_NAME:
+            #    base_yaw = torch.zeros_like(base_yaw) # fixed direction
             self._gripper_down_yaw_w = (
                 base_yaw + yaw_offset + self._gripper_down_yaw_offset_w
             ).clone()
