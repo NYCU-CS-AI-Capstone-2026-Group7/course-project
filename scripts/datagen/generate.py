@@ -521,7 +521,7 @@ def main():
                     # Early termination optimization (only for failed grasp, success is validated after settle)
                     if args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
                         # event == 3 is right after knife lift phase; event == 10 is right after fork lift phase
-                        if (sm._event == 3 or sm._event == 10) and sm._step_count == 0:
+                        if (sm._event == 3 or sm._event == 10) and sm._step_count == 150:
                             target_obj = "knife" if sm._event == 3 else "fork"
                             # Get object Z relative to env origin
                             obj_z = env.scene[target_obj].data.root_pos_w[0, 2].item() - env.scene.env_origins[0, 2].item()
