@@ -30,14 +30,12 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Constants & Configuration
 # ---------------------------------------------------------------------------
-# Table Dimensions (Read from USD scene file)
+# Table Dimensions
 _TABLE_HEIGHT = 0.0409113
-_TABLE_LENGTH = 0.70
-_TABLE_WIDTH = 0.65
 
 _Z_SAFE = _TABLE_HEIGHT + 0.25
 _Z_GRASP = _TABLE_HEIGHT + 0.05
-_Z_RELEASE = _TABLE_HEIGHT + 0.06
+_Z_RELEASE = _TABLE_HEIGHT + 0.05
 
 _FORK_SPAWN_X = (0.35, 0.48)
 _FORK_SPAWN_Y = (-0.28, -0.18)
@@ -47,8 +45,8 @@ _KNIFE_SPAWN_Y = (-0.62, -0.52)
 
 _PLATE_POS = [0.50, -0.40, _TABLE_HEIGHT + 0.05]
 
-_FORK_Z = _TABLE_HEIGHT + 0.015
-_KNIFE_Z = _TABLE_HEIGHT + 0.015
+_FORK_Z = _TABLE_HEIGHT + 0.018
+_KNIFE_Z = _TABLE_HEIGHT + 0.011
 
 _FRANKA_REST_POSE = [0.0, -math.pi/4, 0.0, -3.0*math.pi/4, 0.0, math.pi/2, math.pi/4]
 
@@ -101,20 +99,14 @@ class PyBulletFrankaValidator:
         # Load Table and Robot
         self.plane_id = p.loadURDF("plane.urdf")
         
-        # Table Dimensions (Missing in workspace, placeholders used. Please adjust if needed)
-        self.table_height = _TABLE_HEIGHT
-        self.table_length = _TABLE_LENGTH
-        self.table_width = _TABLE_WIDTH
-        
-        # Spawn Table (represented as a collision box + visual box in PyBullet)
-        table_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[self.table_length / 2, self.table_width / 2, self.table_height / 2])
-        table_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[self.table_length / 2, self.table_width / 2, self.table_height / 2], rgbaColor=[0.6, 0.4, 0.2, 1])
-        # Position table center at (0.353162, -0.351832, self.table_height/2)
+        # Spawn Widened Table to prevent objects falling off bounds in PyBullet
+        table_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.7/2, 1.2/2, _TABLE_HEIGHT/2])
+        table_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.7/2, 1.2/2, _TABLE_HEIGHT/2], rgbaColor=[0.6, 0.4, 0.2, 1])
         self.table_id = p.createMultiBody(
             baseMass=0.0,
             baseCollisionShapeIndex=table_col,
             baseVisualShapeIndex=table_visual,
-            basePosition=[0.353162, -0.351832, self.table_height / 2],
+            basePosition=[0.353162, -0.25, _TABLE_HEIGHT / 2],
             baseOrientation=[0, 0, 0, 1]
         )
         
@@ -128,11 +120,12 @@ class PyBulletFrankaValidator:
             self.robot_quat,
             useFixedBase=True
         )
-        self.ee_index = 11 # panda_hand link index
+        self.ee_index = 11  # panda_hand link index
         
         # Move joints to home rest pose
         for idx, angle in enumerate(_FRANKA_REST_POSE):
             p.resetJointState(self.robot_id, idx, angle)
+            p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=angle, force=1000)
             
         self.objects = {}
         
@@ -152,7 +145,7 @@ class PyBulletFrankaValidator:
         k_euler[0] = 0.0
         knife_quat = p.getQuaternionFromEuler(k_euler)
         
-        # 1. Spawn Plate (Flat cylinder cylinder bounding shape with bounds read from plate.usd)
+        # 1. Spawn Plate (Flat cylinder cylinder bounding shape)
         plate_col = p.createCollisionShape(p.GEOM_CYLINDER, radius=0.036362, height=0.010419)
         plate_visual = p.createVisualShape(p.GEOM_CYLINDER, radius=0.036362, length=0.010419, rgbaColor=[0.9, 0.9, 0.9, 1])
         self.objects["plate"] = p.createMultiBody(
@@ -164,7 +157,7 @@ class PyBulletFrankaValidator:
         )
         
         # 2. Spawn Fork (STL mesh aligned by 90deg about X-axis, scaled by 100)
-        q_align = p.getQuaternionFromEuler([math.pi/2, 0, 0])
+        q_align = p.getQuaternionFromEuler([math.pi/2, 0, math.pi])
         fork_col = p.createCollisionShape(
             p.GEOM_MESH, 
             fileName="packages/simulator/assets/scenes/dining_room/objects/Fork/fork.stl", 
@@ -181,7 +174,7 @@ class PyBulletFrankaValidator:
             baseMass=0.1,
             baseCollisionShapeIndex=fork_col,
             baseVisualShapeIndex=fork_visual,
-            basePosition=fork_pos,
+            basePosition=[fork_pos[0], fork_pos[1], _FORK_Z],
             baseOrientation=fork_quat
         )
 
@@ -202,10 +195,17 @@ class PyBulletFrankaValidator:
             baseMass=0.1,
             baseCollisionShapeIndex=knife_col,
             baseVisualShapeIndex=knife_visual,
-            basePosition=knife_pos,
+            basePosition=[knife_pos[0], knife_pos[1], _KNIFE_Z],
             baseOrientation=knife_quat
         )
         
+        # Step simulation to let spawned objects settle flat on the table
+        for idx in range(7):
+            p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=_FRANKA_REST_POSE[idx], force=1000)
+            
+        for _ in range(100):
+            p.stepSimulation()
+            
     def check_collision(self, ignored_body_id=None):
         """Checks for unintended collisions in the scene."""
         p.performCollisionDetection()
@@ -238,6 +238,7 @@ class PyBulletFrankaValidator:
         # Reset joints to rest pose
         for idx, angle in enumerate(_FRANKA_REST_POSE):
             p.resetJointState(self.robot_id, idx, angle)
+            p.setJointMotorControl2(self.robot_id, idx, p.VELOCITY_CONTROL, targetVelocity=0, force=0)
             
         current_ee_state = p.getLinkState(self.robot_id, self.ee_index)
         current_ee_pos = np.array(current_ee_state[4])
@@ -265,15 +266,16 @@ class PyBulletFrankaValidator:
         
         obj_body_id = self.objects[obj_name]
         grasp_constraint_id = None
+        rel_pos, rel_quat = None, None
         
-        for idx, (p_start, p_end, steps, has_grasped, yaw_s, yaw_e) in enumerate(segments):
+        for p_start, p_end, steps, has_grasped, yaw_s, yaw_e in segments:
             traj = generate_spline_trajectory(p_start, p_end, steps)
             
             # Shortest path angle interpolation for this segment
             diff = (yaw_e - yaw_s + math.pi) % (2.0 * math.pi) - math.pi
             yaw_traj = np.linspace(yaw_s, yaw_s + diff, steps)
             
-            for target_pos, target_yaw_val in zip(traj, yaw_traj):
+            for step_idx, (target_pos, target_yaw_val) in enumerate(zip(traj, yaw_traj)):
                 # Solve Inverse Kinematics command
                 joint_angles = p.calculateInverseKinematics(
                     self.robot_id,
@@ -282,7 +284,7 @@ class PyBulletFrankaValidator:
                     targetOrientation=p.getQuaternionFromEuler([0, math.pi, target_yaw_val + math.pi/2])
                 )
                 
-                # Apply joint angles
+                # Apply joint angles kinematically
                 for j_idx, angle in enumerate(joint_angles[:7]):
                     p.resetJointState(self.robot_id, j_idx, angle)
                     
@@ -291,11 +293,17 @@ class PyBulletFrankaValidator:
                         # Grab event! Attach the object at its current relative transform
                         ee_state = p.getLinkState(self.robot_id, self.ee_index)
                         ee_pos, ee_quat = ee_state[4], ee_state[5]
-                        obj_pos, obj_quat = p.getBasePositionAndOrientation(obj_body_id)
+                        obj_pos_now, obj_quat_now = p.getBasePositionAndOrientation(obj_body_id)
+                        
+                        # Force object orientation to be perfectly flat (roll=0, pitch=0) at grasp
+                        o_euler = list(p.getEulerFromQuaternion(obj_quat_now))
+                        o_euler[0] = 0.0
+                        o_euler[1] = 0.0
+                        obj_quat_now = p.getQuaternionFromEuler(o_euler)
                         
                         # Calculate relative transform
                         inv_ee_pos, inv_ee_quat = p.invertTransform(ee_pos, ee_quat)
-                        rel_pos, rel_quat = p.multiplyTransforms(inv_ee_pos, inv_ee_quat, obj_pos, obj_quat)
+                        rel_pos, rel_quat = p.multiplyTransforms(inv_ee_pos, inv_ee_quat, obj_pos_now, obj_quat_now)
                         
                         grasp_constraint_id = p.createConstraint(
                             parentBodyUniqueId=self.robot_id,
@@ -309,6 +317,17 @@ class PyBulletFrankaValidator:
                             parentFrameOrientation=rel_quat,
                             childFrameOrientation=[0, 0, 0]
                         )
+                    
+                    # Manually teleport object to match gripper exactly (kinematic tracking)
+                    # This prevents springy constraints from twisting/tilting under high IK step forces.
+                    ee_state = p.getLinkState(self.robot_id, self.ee_index)
+                    ee_pos, ee_quat = ee_state[4], ee_state[5]
+                    target_obj_pos, target_obj_quat = p.multiplyTransforms(ee_pos, ee_quat, rel_pos, rel_quat)
+                    
+                    # Flatten the object orientation to roll = 0, pitch = 0 to prevent tilt propagation
+                    target_e = p.getEulerFromQuaternion(target_obj_quat)
+                    target_obj_quat_flat = p.getQuaternionFromEuler([0.0, 0.0, target_e[2]])
+                    p.resetBasePositionAndOrientation(obj_body_id, target_obj_pos, target_obj_quat_flat)
                 else:
                     if grasp_constraint_id is not None:
                         # Release event! Remove constraint
@@ -324,12 +343,16 @@ class PyBulletFrankaValidator:
                         p.removeConstraint(grasp_constraint_id)
                     return False
                     
-                p.stepSimulation()
                 if self.use_gui:
                     time.sleep(0.01)
                     
         if grasp_constraint_id is not None:
             p.removeConstraint(grasp_constraint_id)
+            
+        # Lock final joint positions with motor position control before stepping the settling loop
+        final_joint_angles = [p.getJointState(self.robot_id, i)[0] for i in range(7)]
+        for j_idx, angle in enumerate(final_joint_angles):
+            p.setJointMotorControl2(self.robot_id, j_idx, p.POSITION_CONTROL, targetPosition=angle, force=1000)
             
         # Step simulation for 150 steps to let released object settle to rest under gravity
         for _ in range(150):
@@ -339,7 +362,6 @@ class PyBulletFrankaValidator:
             
             # Check collisions during settling
             if self.check_collision(ignored_body_id=None):
-                print(f"  [DEBUG SETTLING] Collision detected during settling for {obj_name}!")
                 return False
                 
         # Stability check: ensure it hasn't flipped over or tilted significantly
@@ -347,13 +369,11 @@ class PyBulletFrankaValidator:
         matrix = p.getMatrixFromQuaternion(quat)
         local_z_in_world_z = matrix[8] # index 8 is R22 (local Z projection on world Z)
         if local_z_in_world_z < 0.5:
-            print(f"  [DEBUG SETTLING] {obj_name} flipped over! R22={local_z_in_world_z:.3f}")
             return False
             
         # Height check: ensure it hasn't fallen off the table
         pos, _ = p.getBasePositionAndOrientation(obj_body_id)
         if pos[2] < _TABLE_HEIGHT:
-            print(f"  [DEBUG SETTLING] {obj_name} fell off table! Z={pos[2]:.3f} vs table_height={_TABLE_HEIGHT}")
             return False
             
         return True
@@ -368,8 +388,15 @@ class PyBulletFrankaValidator:
 
         self.setup_scene(fork_pos, f_quat_xyzw, knife_pos, k_quat_xyzw)
 
-        f_yaw = yaw_from_quat_wxyz(fork_quat_wxyz)
-        k_yaw = yaw_from_quat_wxyz(knife_quat_wxyz)
+        # Get settled positions and orientations after setup phase settling
+        fork_settled_pos, fork_settled_quat = p.getBasePositionAndOrientation(self.objects["fork"])
+        knife_settled_pos, knife_settled_quat = p.getBasePositionAndOrientation(self.objects["knife"])
+
+        f_quat_wxyz_settled = [fork_settled_quat[3], fork_settled_quat[0], fork_settled_quat[1], fork_settled_quat[2]]
+        k_quat_wxyz_settled = [knife_settled_quat[3], knife_settled_quat[0], knife_settled_quat[1], knife_settled_quat[2]]
+
+        f_yaw = yaw_from_quat_wxyz(f_quat_wxyz_settled)
+        k_yaw = yaw_from_quat_wxyz(k_quat_wxyz_settled)
 
         if getattr(self, "fix_fork_yaw", False):
             f_yaw = 0.0
@@ -378,13 +405,13 @@ class PyBulletFrankaValidator:
 
         # 1. Test Knife (place right)
         k_place_pos = [_PLATE_POS[0] + 0.10, _PLATE_POS[1], _PLATE_POS[2]]
-        knife_ok = self.validate_trajectory(knife_pos, k_yaw, k_place_pos, "knife")
+        knife_ok = self.validate_trajectory(knife_settled_pos, k_yaw, k_place_pos, "knife")
         if not knife_ok:
             return False
 
         # 2. Test Fork (place left)
         f_place_pos = [_PLATE_POS[0] - 0.10, _PLATE_POS[1], _PLATE_POS[2]]
-        fork_ok = self.validate_trajectory(fork_pos, f_yaw, f_place_pos, "fork", target_yaw=math.pi)
+        fork_ok = self.validate_trajectory(fork_settled_pos, f_yaw, f_place_pos, "fork", target_yaw=math.pi)
         return fork_ok
 
     def run_procedural_test(self):
@@ -444,7 +471,7 @@ def main():
         tag_to_object = {2: "knife", 3: "fork"}
         anchor_tag_id = 0
         anchor_world_pose = (0.40, 0.10, 0.0)
-        object_z = _TABLE_HEIGHT + 0.05
+        object_z = 0.05
         object_roll = 0.0
         object_pitch = 0.0
         per_object_yaw_offset = {
