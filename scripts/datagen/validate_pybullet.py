@@ -143,6 +143,15 @@ class PyBulletFrankaValidator:
             p.removeBody(obj_id)
         self.objects.clear()
         
+        # Enforce roll = 0 for fork and knife at init
+        f_euler = list(p.getEulerFromQuaternion(fork_quat))
+        f_euler[0] = 0.0
+        fork_quat = p.getQuaternionFromEuler(f_euler)
+
+        k_euler = list(p.getEulerFromQuaternion(knife_quat))
+        k_euler[0] = 0.0
+        knife_quat = p.getQuaternionFromEuler(k_euler)
+        
         # 1. Spawn Plate (Flat cylinder cylinder bounding shape with bounds read from plate.usd)
         plate_col = p.createCollisionShape(p.GEOM_CYLINDER, radius=0.036362, height=0.010419)
         plate_visual = p.createVisualShape(p.GEOM_CYLINDER, radius=0.036362, length=0.010419, rgbaColor=[0.9, 0.9, 0.9, 1])
@@ -154,9 +163,20 @@ class PyBulletFrankaValidator:
             baseOrientation=[0, 0, 0, 1]
         )
         
-        # 2. Spawn Fork (Box bounding shape with bounds read from fork.usd)
-        fork_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.013713, 0.098401, 0.005565])
-        fork_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.013713, 0.098401, 0.005565], rgbaColor=[0.1, 0.6, 0.8, 1])
+        # 2. Spawn Fork (STL mesh aligned by 90deg about X-axis, scaled by 100)
+        q_align = p.getQuaternionFromEuler([math.pi/2, 0, 0])
+        fork_col = p.createCollisionShape(
+            p.GEOM_MESH, 
+            fileName="packages/simulator/assets/scenes/dining_room/objects/Fork/fork.stl", 
+            meshScale=[100, 100, 100],
+            collisionFrameOrientation=q_align
+        )
+        fork_visual = p.createVisualShape(
+            p.GEOM_MESH,
+            fileName="packages/simulator/assets/scenes/dining_room/objects/Fork/fork.stl",
+            meshScale=[100, 100, 100],
+            visualFrameOrientation=q_align
+        )
         self.objects["fork"] = p.createMultiBody(
             baseMass=0.1,
             baseCollisionShapeIndex=fork_col,
@@ -165,9 +185,19 @@ class PyBulletFrankaValidator:
             baseOrientation=fork_quat
         )
 
-        # 3. Spawn Knife (Box bounding shape with bounds read from knife.usd)
-        knife_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.012294, 0.083621, 0.005127])
-        knife_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.012294, 0.083621, 0.005127], rgbaColor=[0.9, 0.2, 0.2, 1])
+        # 3. Spawn Knife (STL mesh aligned by 90deg about X-axis, scaled by 100)
+        knife_col = p.createCollisionShape(
+            p.GEOM_MESH, 
+            fileName="packages/simulator/assets/scenes/dining_room/objects/Knife/knife.stl", 
+            meshScale=[100, 100, 100],
+            collisionFrameOrientation=q_align
+        )
+        knife_visual = p.createVisualShape(
+            p.GEOM_MESH,
+            fileName="packages/simulator/assets/scenes/dining_room/objects/Knife/knife.stl",
+            meshScale=[100, 100, 100],
+            visualFrameOrientation=q_align
+        )
         self.objects["knife"] = p.createMultiBody(
             baseMass=0.1,
             baseCollisionShapeIndex=knife_col,
@@ -203,7 +233,7 @@ class PyBulletFrankaValidator:
                 return True
         return False
 
-    def validate_trajectory(self, obj_pos, obj_yaw, target_place_pos, obj_name, target_yaw=math.pi/2):
+    def validate_trajectory(self, obj_pos, obj_yaw, target_place_pos, obj_name, target_yaw=0.0):
         """Simulates path segments and checks for self-limits and collisions."""
         # Reset joints to rest pose
         for idx, angle in enumerate(_FRANKA_REST_POSE):
@@ -234,6 +264,7 @@ class PyBulletFrankaValidator:
         ]
         
         obj_body_id = self.objects[obj_name]
+        grasp_constraint_id = None
         
         for idx, (p_start, p_end, steps, has_grasped, yaw_s, yaw_e) in enumerate(segments):
             traj = generate_spline_trajectory(p_start, p_end, steps)
@@ -256,23 +287,75 @@ class PyBulletFrankaValidator:
                     p.resetJointState(self.robot_id, j_idx, angle)
                     
                 if has_grasped:
-                    ee_state = p.getLinkState(self.robot_id, self.ee_index)
-                    ee_pos = ee_state[4]
-                    ee_quat = ee_state[5]
-                    obj_pos_offset = [ee_pos[0], ee_pos[1], ee_pos[2] - 0.05]
-                    p.resetBasePositionAndOrientation(obj_body_id, obj_pos_offset, ee_quat)
+                    if grasp_constraint_id is None:
+                        # Grab event! Attach the object at its current relative transform
+                        ee_state = p.getLinkState(self.robot_id, self.ee_index)
+                        ee_pos, ee_quat = ee_state[4], ee_state[5]
+                        obj_pos, obj_quat = p.getBasePositionAndOrientation(obj_body_id)
+                        
+                        # Calculate relative transform
+                        inv_ee_pos, inv_ee_quat = p.invertTransform(ee_pos, ee_quat)
+                        rel_pos, rel_quat = p.multiplyTransforms(inv_ee_pos, inv_ee_quat, obj_pos, obj_quat)
+                        
+                        grasp_constraint_id = p.createConstraint(
+                            parentBodyUniqueId=self.robot_id,
+                            parentLinkIndex=self.ee_index,
+                            childBodyUniqueId=obj_body_id,
+                            childLinkIndex=-1,
+                            jointType=p.JOINT_FIXED,
+                            jointAxis=[0, 0, 0],
+                            parentFramePosition=rel_pos,
+                            childFramePosition=[0, 0, 0],
+                            parentFrameOrientation=rel_quat,
+                            childFrameOrientation=[0, 0, 0]
+                        )
+                else:
+                    if grasp_constraint_id is not None:
+                        # Release event! Remove constraint
+                        p.removeConstraint(grasp_constraint_id)
+                        grasp_constraint_id = None
                     
                 # Collision check
                 ignored = obj_body_id if has_grasped else None
                 collision_detected = self.check_collision(ignored_body_id=ignored)
                 
                 if collision_detected:
+                    if grasp_constraint_id is not None:
+                        p.removeConstraint(grasp_constraint_id)
                     return False
                     
                 p.stepSimulation()
                 if self.use_gui:
                     time.sleep(0.01)
                     
+        if grasp_constraint_id is not None:
+            p.removeConstraint(grasp_constraint_id)
+            
+        # Step simulation for 150 steps to let released object settle to rest under gravity
+        for _ in range(150):
+            p.stepSimulation()
+            if self.use_gui:
+                time.sleep(0.01)
+            
+            # Check collisions during settling
+            if self.check_collision(ignored_body_id=None):
+                print(f"  [DEBUG SETTLING] Collision detected during settling for {obj_name}!")
+                return False
+                
+        # Stability check: ensure it hasn't flipped over or tilted significantly
+        _, quat = p.getBasePositionAndOrientation(obj_body_id)
+        matrix = p.getMatrixFromQuaternion(quat)
+        local_z_in_world_z = matrix[8] # index 8 is R22 (local Z projection on world Z)
+        if local_z_in_world_z < 0.5:
+            print(f"  [DEBUG SETTLING] {obj_name} flipped over! R22={local_z_in_world_z:.3f}")
+            return False
+            
+        # Height check: ensure it hasn't fallen off the table
+        pos, _ = p.getBasePositionAndOrientation(obj_body_id)
+        if pos[2] < _TABLE_HEIGHT:
+            print(f"  [DEBUG SETTLING] {obj_name} fell off table! Z={pos[2]:.3f} vs table_height={_TABLE_HEIGHT}")
+            return False
+            
         return True
 
     def run_validation_for_episode(self, fork_pos, fork_quat_wxyz, knife_pos, knife_quat_wxyz):
@@ -301,7 +384,7 @@ class PyBulletFrankaValidator:
 
         # 2. Test Fork (place left)
         f_place_pos = [_PLATE_POS[0] - 0.10, _PLATE_POS[1], _PLATE_POS[2]]
-        fork_ok = self.validate_trajectory(fork_pos, f_yaw, f_place_pos, "fork")
+        fork_ok = self.validate_trajectory(fork_pos, f_yaw, f_place_pos, "fork", target_yaw=math.pi)
         return fork_ok
 
     def run_procedural_test(self):
