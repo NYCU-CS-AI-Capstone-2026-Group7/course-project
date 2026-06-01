@@ -102,7 +102,15 @@ try:
         self._lerobot_dataset.save_episode(parallel_encoding=True)
     LeRobotDatasetHandler.flush = patched_flush
     
-    # 4. Patch load_episode_poses to raise object_z to 0.08 to prevent physical penetration
+    # 4. Patch add_frame to override task string with current pose index
+    original_add_frame = LeRobotDatasetHandler.add_frame
+    def patched_add_frame(self, frame: dict):
+        if hasattr(self, "current_pose_idx") and self.current_pose_idx is not None:
+            frame["task"] = f"pose_idx_{self.current_pose_idx}"
+        original_add_frame(self, frame)
+    LeRobotDatasetHandler.add_frame = patched_add_frame
+    
+    # 5. Patch load_episode_poses to raise object_z to 0.08 to prevent physical penetration
     import simulator.utils.object_poses_loader as poses_loader
     original_load_poses = poses_loader.load_episode_poses
 
@@ -276,17 +284,16 @@ def _on_episode_done(
     sm,
     args_cli,
     episodes,
-    next_episode_idx,
+    current_pose_idx,
+    remaining_pose_indices,
     resume_recorded_demo_count,
     current_recorded_demo_count,
     start_record_state,
 ):
     """Handle end-of-episode logic.
 
-    Returns (next_episode_idx, current_recorded_demo_count, start_record_state, should_break).
+    Returns (next_pose_idx, current_recorded_demo_count, start_record_state, should_break, success).
     """
-    total_episodes = len(episodes)
-
     try:
         success = sm.check_success(env)
     except Exception as e:
@@ -316,17 +323,21 @@ def _on_episode_done(
         )
         print(f"Recorded {current_recorded_demo_count} successful demonstrations.")
 
-    if next_episode_idx >= total_episodes:
-        print(f"Replayed all {total_episodes} episodes. Exiting the app.")
-        return next_episode_idx, current_recorded_demo_count, start_record_state, True, success
+    if not remaining_pose_indices:
+        print("Replayed all remaining episodes. Exiting the app.")
+        return None, current_recorded_demo_count, start_record_state, True, success
+
+    next_pose_idx = remaining_pose_indices.pop(0)
 
     env.reset()
     sm.reset()
     auto_terminate(env, False)
-    _apply_episode_poses(env, episodes[next_episode_idx])
-    next_episode_idx += 1
+    _apply_episode_poses(env, episodes[next_pose_idx])
 
-    return next_episode_idx, current_recorded_demo_count, start_record_state, False, success
+    if args_cli.record and hasattr(env, "recorder_manager") and hasattr(env.recorder_manager, "_dataset_file_handler"):
+        env.recorder_manager._dataset_file_handler.current_pose_idx = next_pose_idx
+
+    return next_pose_idx, current_recorded_demo_count, start_record_state, False, success
 
 
 def main():
@@ -396,14 +407,50 @@ def main():
         print(f"Resume recording from existing dataset file with {resume_recorded_demo_count} demonstrations.")
     current_recorded_demo_count = resume_recorded_demo_count
 
-    next_episode_idx = min(resume_recorded_demo_count, len(episodes))
-    if next_episode_idx >= len(episodes):
-        print(f"Resume count {next_episode_idx} ≥ total episodes {len(episodes)}; nothing to do.")
+    # Calculate remaining pose indices to prevent duplicate generation
+    completed_pose_indices = set()
+    if args_cli.record and args_cli.resume:
+        import glob
+        import pandas as pd
+        try:
+            repo_id = args_cli.lerobot_dataset_repo_id
+            meta_globs = [
+                f"/root/.cache/huggingface/lerobot/{repo_id}/meta/episodes/chunk-*/*.parquet",
+                f"/root/.cache/huggingface/lerobot/{repo_id}/meta/episodes.parquet"
+            ]
+            meta_files = []
+            for g in meta_globs:
+                meta_files.extend(glob.glob(g))
+            if meta_files:
+                for f in meta_files:
+                    df = pd.read_parquet(f)
+                    for col in ["tasks", "task"]:
+                        if col in df.columns:
+                            for item in df[col].tolist():
+                                if isinstance(item, str):
+                                    if item.startswith("pose_idx_"):
+                                        completed_pose_indices.add(int(item.split("_")[-1]))
+                                elif hasattr(item, "__iter__"):
+                                    for sub_item in item:
+                                        if isinstance(sub_item, str) and sub_item.startswith("pose_idx_"):
+                                            completed_pose_indices.add(int(sub_item.split("_")[-1]))
+                print(f"[INFO] Detected completed pose indices from database: {sorted(list(completed_pose_indices))}")
+        except Exception as e:
+            print(f"[WARNING] Failed to parse completed pose indices: {e}")
+
+    remaining_pose_indices = [i for i in range(len(episodes)) if i not in completed_pose_indices]
+    print(f"[INFO] Poses remaining to generate: {len(remaining_pose_indices)} / {len(episodes)}")
+
+    if not remaining_pose_indices:
+        print("[INFO] All episodes already completed. Exiting.")
         env.close()
         simulation_app.close()
         return
-    _apply_episode_poses(env, episodes[next_episode_idx])
-    next_episode_idx += 1
+
+    current_pose_idx = remaining_pose_indices.pop(0)
+    _apply_episode_poses(env, episodes[current_pose_idx])
+    if args_cli.record and hasattr(env, "recorder_manager") and hasattr(env.recorder_manager, "_dataset_file_handler"):
+        env.recorder_manager._dataset_file_handler.current_pose_idx = current_pose_idx
 
     start_record_state = False
     interrupted = False
@@ -434,8 +481,9 @@ def main():
                         settling_steps += 1
                     else:
                         settling_steps = 0
+                        finished_pose_idx = current_pose_idx
                         (
-                            next_episode_idx,
+                            current_pose_idx,
                             current_recorded_demo_count,
                             start_record_state,
                             should_break,
@@ -445,17 +493,18 @@ def main():
                             sm,
                             args_cli,
                             episodes,
-                            next_episode_idx,
+                            current_pose_idx,
+                            remaining_pose_indices,
                             resume_recorded_demo_count,
                             current_recorded_demo_count,
                             start_record_state,
                         )
                         if success:
-                            print(f"\033[92m[Data Usage] Pose {next_episode_idx}/{len(episodes)} success. (Total Success: {current_recorded_demo_count})\033[0m")
+                            print(f"\033[92m[Data Usage] Pose {finished_pose_idx + 1}/{len(episodes)} success. (Total Success: {current_recorded_demo_count})\033[0m")
                             success_ID.append(cnt)
                             cnt += 1
                         else:
-                            print(f"\033[91m[Data Usage] Pose {next_episode_idx}/{len(episodes)} fail. (Total Success: {current_recorded_demo_count})\033[0m")
+                            print(f"\033[91m[Data Usage] Pose {finished_pose_idx + 1}/{len(episodes)} fail. (Total Success: {current_recorded_demo_count})\033[0m")
                         if should_break:
                             break
                 else:
