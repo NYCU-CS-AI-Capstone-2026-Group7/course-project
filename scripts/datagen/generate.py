@@ -102,9 +102,31 @@ try:
         self._lerobot_dataset.save_episode(parallel_encoding=True)
     LeRobotDatasetHandler.flush = patched_flush
     
-    print("[INFO] Successfully applied monkeypatches to LeRobotDatasetHandler (get_num_episodes, clear, flush)")
+    # 4. Patch load_episode_poses to raise object_z to 0.08 to prevent physical penetration
+    import simulator.utils.object_poses_loader as poses_loader
+    original_load_poses = poses_loader.load_episode_poses
+
+    def patched_load_episode_poses(path, config):
+        print(f"[INFO] Adjusting object_z from {config.object_z} to 0.08 to prevent physics penetration.")
+        from simulator.utils.object_poses_loader import ObjectPoseConfig
+        new_config = ObjectPoseConfig(
+            tag_to_object=config.tag_to_object,
+            anchor_tag_id=config.anchor_tag_id,
+            anchor_world_pose=config.anchor_world_pose,
+            object_z=0.08, # Increased height to let objects drop naturally
+            object_roll=config.object_roll,
+            object_pitch=config.object_pitch,
+            per_object_yaw_offset=config.per_object_yaw_offset,
+            use_fixed_yaw=config.use_fixed_yaw,
+            ignored_object_names=config.ignored_object_names
+        )
+        return original_load_poses(path, new_config)
+
+    poses_loader.load_episode_poses = patched_load_episode_poses
+
+    print("[INFO] Successfully applied monkeypatches to LeRobotDatasetHandler and load_episode_poses")
 except Exception as e:
-    print(f"[WARNING] Failed to apply monkeypatches to LeRobotDatasetHandler: {e}")
+    print(f"[WARNING] Failed to apply monkeypatches: {e}")
 # ==============================================================================
 
 
