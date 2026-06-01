@@ -501,9 +501,15 @@ def main():
         traceback.print_exc()
         print("[INFO] Cleaning up resources...")
     finally:
-        signal.signal(signal.SIGINT, original_sigint_handler)
+        # Ignore SIGINT (Ctrl+C) during database finalization to prevent database corruption
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         if args_cli.record and hasattr(env.recorder_manager, "finalize"):
+            print("\n[INFO] Committing database and finalizing videos to disk... Please do NOT interrupt! (Ctrl+C is temporarily disabled)")
             env.recorder_manager.finalize()
+            print("[INFO] Dataset finalized and committed successfully!")
+        
+        # Restore original SIGINT handler
+        signal.signal(signal.SIGINT, original_sigint_handler)
         env.close()
         simulation_app.close()
     
