@@ -441,11 +441,11 @@ def main():
                         start_record_state,
                     )
                     if success:
-                        print(f"\033[92m[Data Usage]{cnt}/{len(episodes)} success.\033[0m")
+                        print(f"\033[92m[Data Usage] Pose {next_episode_idx}/{len(episodes)} success. (Total Success: {current_recorded_demo_count})\033[0m")
                         success_ID.append(cnt)
                         cnt += 1
                     else:
-                        print(f"\033[91m[Data Usage]{cnt}/{len(episodes)} fail.\033[0m")
+                        print(f"\033[91m[Data Usage] Pose {next_episode_idx}/{len(episodes)} fail. (Total Success: {current_recorded_demo_count})\033[0m")
                     if should_break:
                         break
                 else:
