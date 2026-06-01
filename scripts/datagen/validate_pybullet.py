@@ -30,9 +30,14 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Constants & Configuration
 # ---------------------------------------------------------------------------
-_Z_SAFE = 0.25
-_Z_GRASP = 0.05
-_Z_RELEASE = 0.06
+# Table Dimensions (Read from USD scene file)
+_TABLE_HEIGHT = 0.0409113
+_TABLE_LENGTH = 0.70
+_TABLE_WIDTH = 0.65
+
+_Z_SAFE = _TABLE_HEIGHT + 0.25
+_Z_GRASP = _TABLE_HEIGHT + 0.05
+_Z_RELEASE = _TABLE_HEIGHT + 0.06
 
 _FORK_SPAWN_X = (0.35, 0.48)
 _FORK_SPAWN_Y = (-0.28, -0.18)
@@ -40,7 +45,10 @@ _FORK_SPAWN_Y = (-0.28, -0.18)
 _KNIFE_SPAWN_X = (0.35, 0.48)
 _KNIFE_SPAWN_Y = (-0.62, -0.52)
 
-_PLATE_POS = [0.50, -0.40, 0.05]
+_PLATE_POS = [0.50, -0.40, _TABLE_HEIGHT + 0.05]
+
+_FORK_Z = _TABLE_HEIGHT + 0.015
+_KNIFE_Z = _TABLE_HEIGHT + 0.015
 
 _FRANKA_REST_POSE = [0.0, -math.pi/4, 0.0, -3.0*math.pi/4, 0.0, math.pi/2, math.pi/4]
 
@@ -93,8 +101,25 @@ class PyBulletFrankaValidator:
         # Load Table and Robot
         self.plane_id = p.loadURDF("plane.urdf")
         
-        # Spawn robot base at (0.35, -0.74, 0.01) to match Isaac Sim config
-        self.robot_pos = [0.35, -0.74, 0.01]
+        # Table Dimensions (Missing in workspace, placeholders used. Please adjust if needed)
+        self.table_height = _TABLE_HEIGHT
+        self.table_length = _TABLE_LENGTH
+        self.table_width = _TABLE_WIDTH
+        
+        # Spawn Table (represented as a collision box + visual box in PyBullet)
+        table_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[self.table_length / 2, self.table_width / 2, self.table_height / 2])
+        table_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[self.table_length / 2, self.table_width / 2, self.table_height / 2], rgbaColor=[0.6, 0.4, 0.2, 1])
+        # Position table center at (0.353162, -0.351832, self.table_height/2)
+        self.table_id = p.createMultiBody(
+            baseMass=0.0,
+            baseCollisionShapeIndex=table_col,
+            baseVisualShapeIndex=table_visual,
+            basePosition=[0.353162, -0.351832, self.table_height / 2],
+            baseOrientation=[0, 0, 0, 1]
+        )
+        
+        # Spawn robot base at (0.35, -0.74, 0.0) on the ground
+        self.robot_pos = [0.35, -0.74, 0.0]
         self.robot_quat = p.getQuaternionFromEuler([0, 0, math.pi/2])
         
         self.robot_id = p.loadURDF(
@@ -118,9 +143,9 @@ class PyBulletFrankaValidator:
             p.removeBody(obj_id)
         self.objects.clear()
         
-        # 1. Spawn Plate (Flat cylinder cylinder bounding shape)
-        plate_col = p.createCollisionShape(p.GEOM_CYLINDER, radius=0.15, height=0.04)
-        plate_visual = p.createVisualShape(p.GEOM_CYLINDER, radius=0.15, length=0.04, rgbaColor=[0.9, 0.9, 0.9, 1])
+        # 1. Spawn Plate (Flat cylinder cylinder bounding shape with bounds read from plate.usd)
+        plate_col = p.createCollisionShape(p.GEOM_CYLINDER, radius=0.036362, height=0.010419)
+        plate_visual = p.createVisualShape(p.GEOM_CYLINDER, radius=0.036362, length=0.010419, rgbaColor=[0.9, 0.9, 0.9, 1])
         self.objects["plate"] = p.createMultiBody(
             baseMass=0.5,
             baseCollisionShapeIndex=plate_col,
@@ -129,9 +154,9 @@ class PyBulletFrankaValidator:
             baseOrientation=[0, 0, 0, 1]
         )
         
-        # 2. Spawn Fork (Box bounding shape)
-        fork_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.015, 0.08, 0.01])
-        fork_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.015, 0.08, 0.01], rgbaColor=[0.1, 0.6, 0.8, 1])
+        # 2. Spawn Fork (Box bounding shape with bounds read from fork.usd)
+        fork_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.013713, 0.098401, 0.005565])
+        fork_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.013713, 0.098401, 0.005565], rgbaColor=[0.1, 0.6, 0.8, 1])
         self.objects["fork"] = p.createMultiBody(
             baseMass=0.1,
             baseCollisionShapeIndex=fork_col,
@@ -140,9 +165,9 @@ class PyBulletFrankaValidator:
             baseOrientation=fork_quat
         )
 
-        # 3. Spawn Knife (Box bounding shape)
-        knife_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.012, 0.09, 0.01])
-        knife_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.012, 0.09, 0.01], rgbaColor=[0.9, 0.2, 0.2, 1])
+        # 3. Spawn Knife (Box bounding shape with bounds read from knife.usd)
+        knife_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.012294, 0.083621, 0.005127])
+        knife_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.012294, 0.083621, 0.005127], rgbaColor=[0.9, 0.2, 0.2, 1])
         self.objects["knife"] = p.createMultiBody(
             baseMass=0.1,
             baseCollisionShapeIndex=knife_col,
@@ -160,8 +185,9 @@ class PyBulletFrankaValidator:
             body_a = contact[1]
             body_b = contact[2]
             
-            # If collision is with plane/ground, ignore
-            if body_a == self.plane_id or body_b == self.plane_id:
+            # If collision is with plane/ground or table, ignore
+            if body_a == self.plane_id or body_b == self.plane_id or \
+               body_a == self.table_id or body_b == self.table_id:
                 continue
                 
             # If collision is between robot and a grabbed object, ignore
@@ -177,7 +203,7 @@ class PyBulletFrankaValidator:
                 return True
         return False
 
-    def validate_trajectory(self, obj_pos, obj_yaw, target_place_pos, obj_name):
+    def validate_trajectory(self, obj_pos, obj_yaw, target_place_pos, obj_name, target_yaw=math.pi/2):
         """Simulates path segments and checks for self-limits and collisions."""
         # Reset joints to rest pose
         for idx, angle in enumerate(_FRANKA_REST_POSE):
@@ -195,30 +221,34 @@ class PyBulletFrankaValidator:
         w_place = np.array([target_place_pos[0], target_place_pos[1], _Z_RELEASE])
         w_retreat = np.array([target_place_pos[0], target_place_pos[1], _Z_SAFE])
         
-        # Segment configuration
+        # Segment configuration with start and end yaws for interpolation
         segments = [
-            (w_start, w_hover, 40, False),
-            (w_hover, w_grasp, 30, False),
-            (w_grasp, w_grasp, 10, True),
-            (w_grasp, w_lift, 30, True),
-            (w_lift, w_transit, 40, True),
-            (w_transit, w_place, 30, True),
-            (w_place, w_place, 10, False),
-            (w_place, w_retreat, 30, False)
+            (w_start, w_hover, 40, False, obj_yaw, obj_yaw),
+            (w_hover, w_grasp, 30, False, obj_yaw, obj_yaw),
+            (w_grasp, w_grasp, 10, True, obj_yaw, obj_yaw),
+            (w_grasp, w_lift, 30, True, obj_yaw, obj_yaw),
+            (w_lift, w_transit, 40, True, obj_yaw, target_yaw),
+            (w_transit, w_place, 30, True, target_yaw, target_yaw),
+            (w_place, w_place, 10, False, target_yaw, target_yaw),
+            (w_place, w_retreat, 30, False, target_yaw, target_yaw)
         ]
         
         obj_body_id = self.objects[obj_name]
         
-        for idx, (p_start, p_end, steps, has_grasped) in enumerate(segments):
+        for idx, (p_start, p_end, steps, has_grasped, yaw_s, yaw_e) in enumerate(segments):
             traj = generate_spline_trajectory(p_start, p_end, steps)
             
-            for target_pos in traj:
+            # Shortest path angle interpolation for this segment
+            diff = (yaw_e - yaw_s + math.pi) % (2.0 * math.pi) - math.pi
+            yaw_traj = np.linspace(yaw_s, yaw_s + diff, steps)
+            
+            for target_pos, target_yaw_val in zip(traj, yaw_traj):
                 # Solve Inverse Kinematics command
                 joint_angles = p.calculateInverseKinematics(
                     self.robot_id,
                     self.ee_index,
                     targetPosition=list(target_pos),
-                    targetOrientation=p.getQuaternionFromEuler([0, math.pi, obj_yaw + math.pi/2])
+                    targetOrientation=p.getQuaternionFromEuler([0, math.pi, target_yaw_val + math.pi/2])
                 )
                 
                 # Apply joint angles
@@ -239,8 +269,8 @@ class PyBulletFrankaValidator:
                 if collision_detected:
                     return False
                     
+                p.stepSimulation()
                 if self.use_gui:
-                    p.stepSimulation()
                     time.sleep(0.01)
                     
         return True
@@ -317,12 +347,43 @@ def main():
 
     if args.object_poses is not None:
         # Load and validate processed UMI demonstration poses
-        from simulator.tasks.cutlery_arrangement.cutlery_arrangement_env_cfg import CutleryArrangementEnvCfg
-        from simulator.utils.object_poses_loader import load_episode_poses
+        import sys
+        from pathlib import Path
 
-        env_cfg = CutleryArrangementEnvCfg()
+        repo_root = Path(__file__).resolve().parents[2]
+        simulator_src = repo_root / "packages" / "simulator" / "src"
+        if simulator_src.exists() and str(simulator_src) not in sys.path:
+            sys.path.insert(0, str(simulator_src))
+
+        from simulator.utils.object_poses_loader import load_episode_poses, ObjectPoseConfig
+
+        # Define Cutlery Task Constants locally to avoid importing isaaclab
+        tag_to_object = {2: "knife", 3: "fork"}
+        anchor_tag_id = 0
+        anchor_world_pose = (0.40, 0.10, 0.0)
+        object_z = _TABLE_HEIGHT + 0.05
+        object_roll = 0.0
+        object_pitch = 0.0
+        per_object_yaw_offset = {
+            "knife": math.pi,
+            "fork": 2.0 * math.pi,
+        }
+        ignored_object_names = ("plate",)
+
+        object_pose_cfg = ObjectPoseConfig(
+            tag_to_object=tag_to_object,
+            anchor_tag_id=anchor_tag_id,
+            anchor_world_pose=anchor_world_pose,
+            object_z=object_z,
+            object_roll=object_roll,
+            object_pitch=object_pitch,
+            per_object_yaw_offset=per_object_yaw_offset,
+            use_fixed_yaw=False,
+            ignored_object_names=ignored_object_names,
+        )
+
         print(f"Loading episodes from {args.object_poses}...")
-        episodes = load_episode_poses(args.object_poses, env_cfg.object_pose_cfg)
+        episodes = load_episode_poses(args.object_poses, object_pose_cfg)
         
         print(f"Verifying {len(episodes)} episodes on CPU...")
         success_count = 0
