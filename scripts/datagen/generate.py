@@ -417,6 +417,7 @@ def main():
     original_sigint_handler = signal.signal(signal.SIGINT, signal_handler)
     cnt = 1
     success_ID = []
+    settling_steps = 0
     try:
         while simulation_app.is_running() and not simulation_app.is_exiting() and not interrupted:
             with torch.inference_mode():
@@ -424,30 +425,39 @@ def main():
                     dynamic_reset_gripper_effort_limit_sim(env, device)
 
                 if sm.is_episode_done:
-                    (
-                        next_episode_idx,
-                        current_recorded_demo_count,
-                        start_record_state,
-                        should_break,
-                        success,
-                    ) = _on_episode_done(
-                        env,
-                        sm,
-                        args_cli,
-                        episodes,
-                        next_episode_idx,
-                        resume_recorded_demo_count,
-                        current_recorded_demo_count,
-                        start_record_state,
-                    )
-                    if success:
-                        print(f"\033[92m[Data Usage] Pose {next_episode_idx}/{len(episodes)} success. (Total Success: {current_recorded_demo_count})\033[0m")
-                        success_ID.append(cnt)
-                        cnt += 1
+                    # Only wait for 300 steps (5s) to settle if we completed all robot actions naturally (event >= 14)
+                    # If it was an early abort (event < 14), we skip settling and end immediately.
+                    need_settle = (sm._event >= len(sm._events_dt))
+                    if need_settle and settling_steps < 300:
+                        actions = sm.get_action(env)
+                        env.step(actions)
+                        settling_steps += 1
                     else:
-                        print(f"\033[91m[Data Usage] Pose {next_episode_idx}/{len(episodes)} fail. (Total Success: {current_recorded_demo_count})\033[0m")
-                    if should_break:
-                        break
+                        settling_steps = 0
+                        (
+                            next_episode_idx,
+                            current_recorded_demo_count,
+                            start_record_state,
+                            should_break,
+                            success,
+                        ) = _on_episode_done(
+                            env,
+                            sm,
+                            args_cli,
+                            episodes,
+                            next_episode_idx,
+                            resume_recorded_demo_count,
+                            current_recorded_demo_count,
+                            start_record_state,
+                        )
+                        if success:
+                            print(f"\033[92m[Data Usage] Pose {next_episode_idx}/{len(episodes)} success. (Total Success: {current_recorded_demo_count})\033[0m")
+                            success_ID.append(cnt)
+                            cnt += 1
+                        else:
+                            print(f"\033[91m[Data Usage] Pose {next_episode_idx}/{len(episodes)} fail. (Total Success: {current_recorded_demo_count})\033[0m")
+                        if should_break:
+                            break
                 else:
                     if not start_record_state:
                         if args_cli.record:
@@ -458,6 +468,17 @@ def main():
                     actions = sm.get_action(env)
                     env.step(actions)
                     sm.advance()
+
+                    # Early termination optimization (only for failed grasp, success is validated after settle)
+                    if args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
+                        # event == 3 is right after knife lift phase; event == 10 is right after fork lift phase
+                        if (sm._event == 3 or sm._event == 10) and sm._step_count == 0:
+                            target_obj = "knife" if sm._event == 3 else "fork"
+                            # Get object Z relative to env origin
+                            obj_z = env.scene[target_obj].data.root_pos_w[0, 2].item() - env.scene.env_origins[0, 2].item()
+                            if obj_z < 0.08: # Normal lifted height is ~0.20+, if < 0.08 it means grasp failed
+                                print(f"[INFO] Early abort: Failed to grasp {target_obj} (z={obj_z:.3f} < 0.08).")
+                                sm._episode_done = True
 
                     if fall_check_object_names and _any_object_fell(
                         env, fall_check_object_names, _FALL_THRESHOLD_Z
