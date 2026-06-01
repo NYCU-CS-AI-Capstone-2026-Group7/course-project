@@ -326,7 +326,8 @@ def main():
     if args_cli.record:
         _replace_recorder_manager(env, env_cfg, args_cli)
 
-    rate_limiter = RateLimiter(args_cli.step_hz)
+    rate_limiter = None if args_cli.headless else RateLimiter(args_cli.step_hz)
+
 
     if hasattr(env, "initialize"):
         env.initialize()
