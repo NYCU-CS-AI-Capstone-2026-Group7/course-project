@@ -67,6 +67,35 @@ TASK_REGISTRY = {
     "HCIS-CutleryArrangement-SingleArm-v0": (ProceduralCutleryArrangementStateMachine, "keyboard"),
 }
 
+
+# ==============================================================================
+# Monkeypatch LeRobotDatasetHandler to support resume and parallel video encoding
+# ==============================================================================
+try:
+    from leisaac.enhance.datasets.lerobot_dataset_handler import LeRobotDatasetHandler
+    
+    # 1. Fix get_num_episodes
+    def patched_get_num_episodes(self) -> int:
+        return self._lerobot_dataset.num_episodes
+    LeRobotDatasetHandler.get_num_episodes = patched_get_num_episodes
+    
+    # 2. Add safety check to clear() to prevent 'NoneType' object is not subscriptable
+    def patched_clear(self):
+        if getattr(self._lerobot_dataset, "episode_buffer", None) is not None:
+            self._lerobot_dataset.clear_episode_buffer()
+    LeRobotDatasetHandler.clear = patched_clear
+    
+    # 3. Enable parallel video encoding during flush()
+    def patched_flush(self):
+        self._lerobot_dataset.save_episode(parallel_encoding=True)
+    LeRobotDatasetHandler.flush = patched_flush
+
+    print("[INFO] Successfully applied monkeypatches to LeRobotDatasetHandler")
+except Exception as e:
+    print(f"[WARNING] Failed to apply monkeypatches: {e}")
+# ==============================================================================
+
+
 # Spawning ranges in world frame
 _PLATE_X_RANGE = (0.48, 0.52)
 _PLATE_Y_RANGE = (-0.42, -0.38)
@@ -240,6 +269,7 @@ def _on_episode_done(
     env,
     sm,
     args_cli,
+    resume_recorded_demo_count,
     current_recorded_demo_count,
     start_record_state,
 ):
@@ -264,9 +294,12 @@ def _on_episode_done(
 
     if (
         args_cli.record
-        and env.recorder_manager.exported_successful_episode_count > current_recorded_demo_count
+        and env.recorder_manager.exported_successful_episode_count + resume_recorded_demo_count
+        > current_recorded_demo_count
     ):
-        current_recorded_demo_count = env.recorder_manager.exported_successful_episode_count
+        current_recorded_demo_count = (
+            env.recorder_manager.exported_successful_episode_count + resume_recorded_demo_count
+        )
         print(f"Recorded {current_recorded_demo_count} successful demonstrations.")
 
     should_break = current_recorded_demo_count >= args_cli.num_demos
@@ -322,18 +355,24 @@ def main():
     sm.reset()
 
     _apply_random_spawns(env)
+    resume_recorded_demo_count = 0
+    if args_cli.record and args_cli.resume:
+        resume_recorded_demo_count = env.recorder_manager._dataset_file_handler.get_num_episodes()
+        print(f"Resume recording from existing dataset file with {resume_recorded_demo_count} demonstrations.")
+    current_recorded_demo_count = resume_recorded_demo_count
 
-    current_recorded_demo_count = 0
     start_record_state = False
     interrupted = False
 
     def signal_handler(signum, frame):
+        """Handle SIGINT (Ctrl+C) signal."""
         nonlocal interrupted
         interrupted = True
         print("\n[INFO] KeyboardInterrupt (Ctrl+C) detected. Cleaning up...")
 
     original_sigint_handler = signal.signal(signal.SIGINT, signal_handler)
-    cnt = 1
+    cnt = resume_recorded_demo_count + 1
+    settling_steps = 0
     
     try:
         while simulation_app.is_running() and not simulation_app.is_exiting() and not interrupted:
@@ -342,26 +381,36 @@ def main():
                     dynamic_reset_gripper_effort_limit_sim(env, args_cli.device)
 
                 if sm.is_episode_done:
-                    (
-                        current_recorded_demo_count,
-                        start_record_state,
-                        should_break,
-                        success,
-                    ) = _on_episode_done(
-                        env,
-                        sm,
-                        args_cli,
-                        current_recorded_demo_count,
-                        start_record_state,
-                    )
-                    if success:
-                        print(f"\033[92m[Procedural Generation] {cnt}/{args_cli.num_demos} success.\033[0m")
-                        cnt += 1
+                    # Only wait for 300 steps (5s) to settle if we completed all robot actions naturally (current_object_idx >= 2)
+                    # If it was an early abort, we skip settling and end immediately.
+                    need_settle = (sm._current_object_idx >= 2)
+                    if need_settle and settling_steps < 300:
+                        actions = sm.get_action(env)
+                        env.step(actions)
+                        settling_steps += 1
                     else:
-                        print(f"\033[91m[Procedural Generation] Episode failed. Retrying.\033[0m")
-                    
-                    if should_break:
-                        break
+                        settling_steps = 0
+                        (
+                            current_recorded_demo_count,
+                            start_record_state,
+                            should_break,
+                            success,
+                        ) = _on_episode_done(
+                            env,
+                            sm,
+                            args_cli,
+                            resume_recorded_demo_count,
+                            current_recorded_demo_count,
+                            start_record_state,
+                        )
+                        if success:
+                            print(f"\033[92m[Procedural Generation] {cnt}/{args_cli.num_demos} success.\033[0m")
+                            cnt += 1
+                        else:
+                            print(f"\033[91m[Procedural Generation] Episode failed. Retrying.\033[0m")
+                        
+                        if should_break:
+                            break
                 else:
                     if not start_record_state:
                         if args_cli.record:
@@ -380,15 +429,31 @@ def main():
                     env.step(actions)
                     sm.advance()
 
+                    # Early termination optimization (only for failed grasp, success is validated after settle)
+                    if args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
+                        if sm.step_count == 155:
+                            target_obj = "knife" if sm._current_object_idx == 0 else "fork"
+                            # Get object Z relative to env origin
+                            obj_z = env.scene[target_obj].data.root_pos_w[0, 2].item() - env.scene.env_origins[0, 2].item()
+                            if obj_z < 0.08:
+                                print(f"[INFO] Early abort: Failed to grasp {target_obj} (z={obj_z:.3f} < 0.08).")
+                                sm._episode_done = True
+
                 if rate_limiter:
                     rate_limiter.sleep(env)
 
             if interrupted:
                 break
     finally:
-        signal.signal(signal.SIGINT, original_sigint_handler)
+        # Ignore SIGINT (Ctrl+C) during database finalization to prevent database corruption
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         if args_cli.record and hasattr(env.recorder_manager, "finalize"):
+            print("\n[INFO] Committing database and finalizing videos to disk... Please do NOT interrupt! (Ctrl+C is temporarily disabled)")
             env.recorder_manager.finalize()
+            print("[INFO] Dataset finalized and committed successfully!")
+        
+        # Restore original SIGINT handler
+        signal.signal(signal.SIGINT, original_sigint_handler)
         env.close()
         simulation_app.close()
 
