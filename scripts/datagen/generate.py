@@ -80,6 +80,34 @@ TASK_REGISTRY = {
 }
 
 
+# ==============================================================================
+# Monkeypatch LeRobotDatasetHandler to support resume and parallel video encoding
+# ==============================================================================
+try:
+    from leisaac.enhance.datasets.lerobot_dataset_handler import LeRobotDatasetHandler
+    
+    # 1. Fix get_num_episodes
+    def patched_get_num_episodes(self) -> int:
+        return self._lerobot_dataset.num_episodes
+    LeRobotDatasetHandler.get_num_episodes = patched_get_num_episodes
+    
+    # 2. Add safety check to clear() to prevent 'NoneType' object is not subscriptable
+    def patched_clear(self):
+        if getattr(self._lerobot_dataset, "episode_buffer", None) is not None:
+            self._lerobot_dataset.clear_episode_buffer()
+    LeRobotDatasetHandler.clear = patched_clear
+    
+    # 3. Enable parallel video encoding during flush()
+    def patched_flush(self):
+        self._lerobot_dataset.save_episode(parallel_encoding=True)
+    LeRobotDatasetHandler.flush = patched_flush
+    
+    print("[INFO] Successfully applied monkeypatches to LeRobotDatasetHandler (get_num_episodes, clear, flush)")
+except Exception as e:
+    print(f"[WARNING] Failed to apply monkeypatches to LeRobotDatasetHandler: {e}")
+# ==============================================================================
+
+
 class RateLimiter:
     """Convenience class for enforcing rates in loops."""
 
