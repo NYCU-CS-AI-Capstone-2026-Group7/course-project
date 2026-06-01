@@ -215,12 +215,17 @@ class ProceduralCutleryArrangementStateMachine(StateMachineBase):
         
         # Build Cartesian Control Points
         # Shape: (num_envs, 3)
+        # Shift the grasp position away from the tip (towards the handle) by 4 cm
+        dx = -0.04 * torch.cos(obj_yaw)
+        dy = -0.04 * torch.sin(obj_yaw)
+        c_offset = torch.stack([dx, dy, torch.zeros_like(dx)], dim=-1)
+
         c_start = start_ee_pos
-        c_hover = obj_pos.clone()
+        c_hover = obj_pos.clone() + c_offset
         c_hover[:, 2] = _Z_SAFE
-        c_grasp = obj_pos.clone()
+        c_grasp = obj_pos.clone() + c_offset
         c_grasp[:, 2] = _Z_GRASP
-        c_lift = obj_pos.clone()
+        c_lift = obj_pos.clone() + c_offset
         c_lift[:, 2] = _Z_SAFE
         c_transit = place_pos.clone()
         c_transit[:, 2] = _Z_SAFE
