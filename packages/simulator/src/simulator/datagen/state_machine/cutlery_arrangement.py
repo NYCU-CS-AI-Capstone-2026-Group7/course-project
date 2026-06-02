@@ -260,11 +260,23 @@ class CutleryArrangementStateMachine(StateMachineBase):
             yaw_offset=_GRASP_YAW_OFFSET,
         )
 
-        grasp_anchor_w = _retreat_xy_toward(
-            obj_pos_w,
-            robot_root_pos_w,
-            _GRASP_RETREAT_PER_OBJECT.get(obj_name, 0.0),
-        )
+        # Calculate local frame offset away from the tip (towards the handle)
+        # Fork: tip points to +z, handle points to -z
+        # Knife: tip points to -z, handle points to +z
+        device = obj_pos_w.device
+        num_envs = obj_pos_w.shape[0]
+        distance = _GRASP_RETREAT_PER_OBJECT.get(obj_name, 0.0)
+        
+        local_offset = torch.zeros((num_envs, 3), device=device, dtype=obj_pos_w.dtype)
+        if obj_name == _FORK_NAME:
+            local_offset[:, 2] = -distance
+        elif obj_name == _KNIFE_NAME:
+            local_offset[:, 2] = distance
+            
+        world_offset = quat_apply(obj_quat_w, local_offset)
+        
+        grasp_anchor_w = obj_pos_w.clone()
+        grasp_anchor_w[:, :2] += world_offset[:, :2]
 
         if phase_in_cycle == 0:
             target_pos_w, gripper_cmd = self._phase_move_above_object(obj_pos_w, num_envs, device)
