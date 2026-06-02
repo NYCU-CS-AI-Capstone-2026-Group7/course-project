@@ -93,3 +93,38 @@ python scripts/datagen/generate.py \
 python scripts/datagen/validate_pybullet.py \
     --object_poses data/AI-final-49/demos/mapping/object_poses.json
 ```
+
+---
+
+## 四、 合併多個 object_poses.json 檔案的方法
+
+根據你的數據來源（是實體人類影片重建的 Session 目錄，還是純 JSON 位姿設定檔），我們提供以下幾種合併方式：
+
+### 方法一：合併實體錄影的多個 Sessions (UMI 內建工具，推薦用於實體示範)
+如果您有複數個獨立錄影的 Session 目錄（例如分別位於 `data/AI-final-49_session1` 與 `data/AI-final-49_session2`），其內部各自有 SLAM 重建出來的 `object_poses.json`。可以使用專案內建的 `merge-object-poses` 工具將這幾個 **Session 目錄** 直接進行物理合併：
+
+```bash
+# 語法：uv run umi merge-object-poses <session_1> <session_2> ... -o <output_session>
+# 合併後，產出的合併位姿 json 會位於 data/AI-final-49_merged/demos/mapping/object_poses.json
+uv run umi merge-object-poses data/AI-final-49_session1 data/AI-final-49_session2 -o data/AI-final-49_merged
+```
+* **特點**：這適用於 UMI 實體人手示範影片所產生的數據結構合併，它會一併整理 Session 的影像軌跡與相對應的 poses 檔。
+
+### 方法二：直接合併純 JSON 檔案（自動解決命名衝突，推薦用於程序化/隨機 Poses）
+如果是多個已生成好的 `object_poses.json` 檔案（例如您分別跑了幾次隨機程序化生成得到的 outputs），需要直接把 JSON 裡的 episodes 合併，但又擔心 `video_name` 重名（例如兩個 JSON 內都有 `episode_0`）會導致重播錄製時資料被覆蓋，我們實作了 [merge_poses.py](file:///media/user/ext4Storage/癢又ㄉ/Syncing/大學/大三下/AiCapstone/course-project/scripts/datagen/merge_poses.py) 來安全地合併多個 JSON 檔：
+
+```bash
+# 執行合併腳本，傳入多個輸入 JSON，並輸出合併後的 JSON
+python scripts/datagen/merge_poses.py \
+    --inputs data/procedural_spawn/demos/mapping/object_poses.json data/AI-final-49/demos/mapping/object_poses.json \
+    --output data/merged_object_poses.json
+```
+* **特點**：若偵測到重名的 `video_name`，腳本會自動為重名者加上 `_dup1`、`_dup2` 等後綴，安全無衝突。
+
+### 方法三：使用 Python 一行指令快速合併（無衝突且純 JSON 時適用）
+若確定兩份 JSON 的 `video_name` 完全沒有重複，亦可在終端機中使用 Python 一行命令直接將其相加：
+```bash
+python -c "import json; open('data/merged_object_poses.json', 'w').write(json.dumps(json.load(open('data/procedural_spawn/demos/mapping/object_poses.json')) + json.load(open('data/AI-final-49/demos/mapping/object_poses.json')), indent=4))"
+```
+
+
