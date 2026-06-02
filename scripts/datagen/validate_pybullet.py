@@ -86,8 +86,9 @@ def yaw_from_quat_wxyz(quat_wxyz):
 class PyBulletFrankaValidator:
     """Validator using PyBullet physics engine for lightweight CPU simulations."""
 
-    def __init__(self, use_gui=False):
+    def __init__(self, use_gui=False, verbose=False):
         self.use_gui = use_gui
+        self.verbose = verbose
         if self.use_gui:
             p.connect(p.GUI)
         else:
@@ -350,6 +351,8 @@ class PyBulletFrankaValidator:
                 collision_detected = self.check_collision(ignored_body_id=ignored)
                 
                 if collision_detected:
+                    if self.verbose:
+                        print(f"[DEBUG] Collision detected in segment starting at {p_start} to {p_end} (has_grasped={has_grasped})")
                     if grasp_constraint_id is not None:
                         p.removeConstraint(grasp_constraint_id)
                     return False
@@ -373,6 +376,8 @@ class PyBulletFrankaValidator:
             
             # Check collisions during settling
             if self.check_collision(ignored_body_id=None):
+                if self.verbose:
+                    print("[DEBUG] Collision detected during settling phase")
                 return False
                 
         # Stability check: ensure it hasn't flipped over or tilted significantly
@@ -380,11 +385,15 @@ class PyBulletFrankaValidator:
         matrix = p.getMatrixFromQuaternion(quat)
         local_z_in_world_z = matrix[8] # index 8 is R22 (local Z projection on world Z)
         if local_z_in_world_z < 0.5:
+            if self.verbose:
+                print(f"[DEBUG] Stability check failed: local_z_in_world_z={local_z_in_world_z:.4f}")
             return False
             
         # Height check: ensure it hasn't fallen off the table
         pos, _ = p.getBasePositionAndOrientation(obj_body_id)
-        if pos[2] < _TABLE_HEIGHT:
+        if pos[2] < _TABLE_HEIGHT - 0.01:
+            if self.verbose:
+                print(f"[DEBUG] Height check failed: pos[2]={pos[2]:.4f} (table height limit={_TABLE_HEIGHT - 0.01:.4f})")
             return False
             
         return True
@@ -452,6 +461,7 @@ def main():
     parser = argparse.ArgumentParser(description="PyBullet Franka Trajectory Validator")
     parser.add_argument("--num_runs", type=int, default=10, help="Number of random validation loops to execute.")
     parser.add_argument("--gui", action="store_true", help="Enable GUI visualization.")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose debug logging of failure reasons.")
     parser.add_argument(
         "--object_poses",
         type=str,
@@ -462,7 +472,7 @@ def main():
     parser.add_argument("--fix_fork_yaw", action="store_true", help="Force the fork's grasp yaw to be zero.")
     args = parser.parse_args()
     
-    validator = PyBulletFrankaValidator(use_gui=args.gui)
+    validator = PyBulletFrankaValidator(use_gui=args.gui, verbose=args.verbose)
     validator.fix_knife_yaw = args.fix_knife_yaw
     validator.fix_fork_yaw = args.fix_fork_yaw
 
