@@ -156,8 +156,8 @@ class PyBulletFrankaValidator:
             baseOrientation=[0, 0, 0, 1]
         )
         
-        # 2. Spawn Fork (STL mesh aligned by 90deg about X-axis, scaled by 100)
-        q_align = p.getQuaternionFromEuler([math.pi/2, 0, math.pi])
+        # 2. Spawn Fork (STL mesh aligned by -90deg about X-axis, scaled by 100)
+        q_align = p.getQuaternionFromEuler([-math.pi/2, 0, math.pi])
         fork_col = p.createCollisionShape(
             p.GEOM_MESH, 
             fileName="packages/simulator/assets/scenes/dining_room/objects/Fork/fork.stl", 
@@ -178,7 +178,7 @@ class PyBulletFrankaValidator:
             baseOrientation=fork_quat
         )
 
-        # 3. Spawn Knife (STL mesh aligned by 90deg about X-axis, scaled by 100)
+        # 3. Spawn Knife (STL mesh aligned by -90deg about X-axis, scaled by 100)
         knife_col = p.createCollisionShape(
             p.GEOM_MESH, 
             fileName="packages/simulator/assets/scenes/dining_room/objects/Knife/knife.stl", 
@@ -248,10 +248,10 @@ class PyBulletFrankaValidator:
         w_hover = np.array([obj_pos[0], obj_pos[1], _Z_SAFE])
         
         # Calculate local frame offset away from the tip (towards the handle)
-        # Fork: tip points to +Y in body frame, handle to -Y. Local offset = [0.0, -0.025, 0.0]
-        # Knife: tip points to -Y in body frame, handle to +Y. Local offset = [0.0, 0.025, 0.0]
+        # Fork (after 180deg X-axis flip): tip points to -Y in body frame, handle to +Y. Local offset = [0.0, 0.025, 0.0]
+        # Knife (after 180deg X-axis flip): tip points to +Y in body frame, handle to -Y. Local offset = [0.0, -0.025, 0.0]
         obj_quat_xyzw = p.getQuaternionFromEuler([0.0, 0.0, obj_yaw])
-        local_offset = [0.0, -0.025, 0.0] if obj_name == "fork" else [0.0, 0.025, 0.0]
+        local_offset = [0.0, 0.025, 0.0] if obj_name == "fork" else [0.0, -0.025, 0.0]
         
         # Rotate offset to world frame
         world_offset_pos, _ = p.multiplyTransforms([0, 0, 0], obj_quat_xyzw, local_offset, [0, 0, 0, 1])
@@ -292,7 +292,7 @@ class PyBulletFrankaValidator:
                     self.robot_id,
                     self.ee_index,
                     targetPosition=list(target_pos),
-                    targetOrientation=p.getQuaternionFromEuler([0, math.pi, target_yaw_val + math.pi/2])
+                    targetOrientation=p.getQuaternionFromEuler([math.pi, 0, target_yaw_val + math.pi/2])
                 )
                 
                 # Apply joint angles kinematically
