@@ -1,110 +1,95 @@
-# 隨機程序化數據生成與輕量化驗證指南 (Group 7)
+# 隨機程序化位姿生成、輕量化驗證與資料錄製指南 (Group 7)
 
-本文件說明了我們為餐具擺放任務（`HCIS-CutleryArrangement-SingleArm-v0`）在 `feat/data-generation` 分支中實作的隨機程序化生成方案與驗證腳本。
+本文件說明了我們為餐具擺放任務（`HCIS-CutleryArrangement-SingleArm-v0`）所實作的**隨機程序化位姿生成方案與驗證腳本**。
 
 ---
 
 ## 📌 TL;DR (太長不看版)
-* **自動隨機擺餐具跟手肘位置**：不用手動調 JSON 檔，開局直接隨機把餐具與起點撒在桌上。
-* **手夾餐具動得很順、像真人**：用三次樣條數學公式，把移動路徑自動「裁圓角」，讓手臂夾東西時不卡頓、極度流暢。
-* **手不會自己折斷或撞爛盤子**：用了七自由度手臂的零空間公式，手臂伸出去時手肘會自動擺在最舒適的位置，避免奇異點。
-* **可選擇要不要「把刀叉轉正」**：新增 `--fix_knife_yaw` 與 `--fix_fork_yaw`，一鍵決定要不要強制把抓取角度鎖死為 0。
-* **不吃效能、一秒驗證有沒有撞到**：做了一個超輕量的 PyBullet 腳本，只用 CPU、不用開 Isaac Sim、不用下載幾 GB 的 3D USD 檔。
-* **前置過濾人類影片**：驗證程式能直接吃 UMI 產出的 `object_poses.json`，在 CPU 端用 Franka 手臂預演抓取，一秒抓出哪些人類錄影在模擬器中會撞車或解不出 IK，直接剔除，避免污染模型！
-* **與舊代碼完全分開**：全部做成外掛 (Addon) 形式，不用的話隨時可以當作沒這回事。
+* **隨機生成符合 UMI 格式的 Poses**：使用 `generate_from_zero.py` 在桌面上隨機撒點產生餐具初始位姿，不再強綁人類 SLAM 影片，全自動且高效率。
+* **CPU 端一秒過濾，不吃 Isaac 模擬點數**：利用 PyBullet CPU 物理模擬快速執行手臂運動學（IK）與碰撞預演，將不合理的位姿在進入 Isaac Sim 渲染前直接剔除。
+* **對齊狀態機局部坐標抓取偏移 (Local Frame Translation)**：捨棄舊版朝基座方向拉回的偏心抓取，改為依據刀叉自身的旋轉角度（Yaw），沿長軸向手柄方向精準偏移 `2.5 cm`。無論餐具如何旋轉，夾爪都能穩穩抓住手柄相同幾何位置。
+* **解決下放穿透與反彈物理錯誤**：對齊 Isaac Sim 與 PyBullet 的下放高度幾何定義。夾爪在釋放刀叉時，手指與餐具底端會懸空於桌面表層上方約 `1.5 cm` 處開夾釋放，完全消除了刀叉被壓入桌面後反彈飛起的 Bug。
+* **統一資料生成入口**：舊的 `generate_procedural.py` 與 `procedural_cutlery.py` 樣條狀態機已全數廢棄刪除。整個隨機程序化生成管線完全收斂至「`generate_from_zero.py` 產生 Poses $\rightarrow$ `generate.py` 模擬重播錄製」的主管線中，代碼更加乾淨。
 
 ---
 
 ## 一、 主要設計與架構
 
-我們架構的核心目標是**「高度解耦、外掛式 (Addon)」**：
+我們架構的核心目標是**「高度解耦、流程統一、CPU 預篩選」**：
 
-### 1. 隨機程序化資料生成主程式 (`scripts/datagen/generate_procedural.py`)
-* **防重疊隨機 Spawning**：每次 Reset 後，隨機在檯面合理範圍生成刀叉與起點，並透過距離過濾避免重疊。
-* **全局變換 (Global Frame Perturbation)**：對整個餐桌與餐具坐標疊加隨機平移與 Z 軸旋轉，強迫 Policy 學習相對幾何關係。
-* **新增可選的刀叉 Yaw 鎖定開關**：
-  * 新增 `--fix_knife_yaw` 和 `--fix_fork_yaw` 參數，允許開發者可選地將刀子或叉子的抓取朝向角度（相對工作區）鎖死為 `0.0`，滿足助教設置的定角抓取需求。
+```mermaid
+graph TD
+    A[generate_from_zero.py] -->|1. 產生多個隨機 Poses| B[隨機物體位置與朝向]
+    B -->|2. 預檢運動學與碰撞| C[validate_pybullet.py]
+    C -->|3. 保留成功 Poses| D[篩選出合格 Poses]
+    D -->|4. 寫入 JSON| E[object_poses.json]
+    E -->|5. 一次性生成 LeRobot 數據集| F[generate.py]
+    F -->|完成| G[Replay Dataset]
+```
 
-### 2. 樣條平滑化狀態機 (`ProceduralCutleryArrangementStateMachine`)
-* 檔案位置：[procedural_cutlery.py](file:///media/user/ext4Storage/癢又ㄉ/Syncing/大學/大三下/AiCapstone/course-project/packages/simulator/src/simulator/datagen/state_machine/procedural_cutlery.py)
-* **Catmull-Rom 三次樣條插值**：藉由幾何控制點擬合出 $C^1$ 連續的 3D 笛卡爾平滑路徑，消除段落間的停頓。
-* **零空間控制 (Null-Space IK)**：控制手臂 EE 時將剩餘的 1-DoF 投影至零空間中，將肘部推向默認舒適姿態。
+### 1. 程序化隨機位姿生成器 (`scripts/datagen/generate_from_zero.py`)
+* **Spawning 區間隨機化**：隨機在檯面合理範圍生成刀叉初始座標與朝向角。
+* **局部座標平移抓取偏移 (Grasp Offset)**：
+  * **叉子 (Fork)**：STL/USD 尖端朝向局部 $+Z$，手柄朝向 $-Z$。手臂抓取點往 $-Z$ 偏移 `2.5 cm`，自動夾在手柄側。
+  * **刀子 (Knife)**：STL/USD 尖端朝向局部 $-Z$，手柄朝向 $+Z$。手臂抓取點往 $+Z$ 偏移 `2.5 cm`，自動夾在手柄側。
+* **調用 PyBullet 預檢**：生成過程中直接導入 `PyBulletFrankaValidator` 驗證，只將物理上安全、IK 能解的有效位姿寫入 `object_poses.json`。
 
-### 3. CPU 輕量化快速碰撞驗證器 (`scripts/datagen/validate_pybullet.py`)
-* **輕量 URDF/幾何模擬**：載入內建的 Franka URDF 手臂模型，並將餐具與盤子用簡化包圍體（Cylinders & Boxes）模擬，透過 CPU 執行碰撞攔截。
+### 2. CPU 輕量化快速碰撞驗證器 (`scripts/datagen/validate_pybullet.py`)
+* **輕量 URDF 模擬**：載入 Franka URDF 手臂模型，並將餐具與盤子用包圍體（Mesh / Cylinder）表示，透過 CPU 執行快速的軌跡碰撞攔截。
+* **釋放高度對齊**：`_Z_RELEASE` 常數更新為 `_TABLE_HEIGHT + 0.10`（約 $14\text{ cm}$ 腕部高度），確保 PyBullet 驗證的落點高度與 Isaac Sim 的釋放高度一致，杜絕桌面穿透檢測死角。
+* **抓取偏移對齊**：同樣將抓取偏移改為沿著物件的局部 Y 軸（對齊 `q_align` 旋轉後的 STL 長軸）平移 `2.5 cm`，保持與狀態機一模一樣的幾何路徑。
 
----
-
-## 二、 舊代碼摘要與本分支改動對比
-
-### 1. 原本代碼與文件摘要
-* **`docs/synthetic_data_generation.md` (原版)**：說明如何將 UMI 重建的位姿資料，在模擬器 (Isaac Lab) 中結合 scripted 狀態機執行 pick-and-place，並使用 `LeRobotRecorderManager` 錄製生成 LeRobot 訓練資料集的 5 大步驟。
-* **`scripts/datagen/generate.py` (原版)**：依賴傳入 `--object_poses` JSON 檔案，以 `load_episode_poses` 載入固定 episodes。每次 Reset 時呼叫 `_apply_episode_poses` 套用物體位置，由舊狀態機直線插值完成抓取並錄製。
-
-### 2. 本分支 (`feat/data-generation`) 改動與新增
-* **全新程序化生成主程式**：新增了平行腳本 `scripts/datagen/generate_procedural.py`，不再強綁人類的 JSON，可自由在 Isaac Sim 中全自動生成數據。
-* **引入三次樣條與零空間狀態機**：新增了 `packages/simulator/src/simulator/datagen/state_machine/procedural_cutlery.py`，將生硬的分段直線插值升級為平滑的 Catmull-Rom 軌跡，並引入冗餘零空間避障與奇異點防範。
-* **新增 CPU 獨立驗證腳本**：新增了 `scripts/datagen/validate_pybullet.py`，完全在 CPU 上運行，可用於隨機軌跡測試或實體 Demo JSON 前置過濾。
+### 3. 主重播生成程式 (`scripts/datagen/generate.py`)
+* 依賴讀取生成的 `object_poses.json`，在 Isaac Sim 中控制 Franka 手臂完成抓取流程，並使用 `LeRobotRecorderManager` 錄製生成 LeRobot 格式訓練數據集。
 
 ---
 
-## 三、 驗證人類操作的可行性與局限性
+## 二、 執行指令與操作說明
 
-本專案的驗證程式碼（`validate_pybullet.py`）**完全可以用來驗證人類操作影片（Step 3 產出的 JSON）**！
+### 1. 產生並預過濾程序化位姿 JSON (generate_from_zero.py)
+* **建議生成數量**：建議設定 `--num_demos 100` 或 `200` 個。
+* **理由**：LeRobot 策略模型（如 Diffusion Policy）需要約 100 到 200 個成功的 Episodes 以達到穩定的操控表現。
 
-* **驗證原理**：
-  當您使用 `--object_poses data/YYYYMMDD-taskname/demos/mapping/object_poses.json` 執行驗證時，腳本會將人類示範中偵測到的餐具「初始擺放位姿（Spawning Poses）」載入到 PyBullet 環境中，並讓虛擬 Franka 手臂執行抓取軌跡。
-* **局限性說明**：
-  * 由於 `object_poses.json` 中**只記錄了餐具的初始位置**，而沒有記錄人類手臂完整的「實體運動軌跡」。
-  * 因此，此驗證本質上是驗證：**「在該人手示範擺放的配置下，Franka 手臂以其自身的運動學與樣條規劃，是否能順利抓起餐具且不撞擊盤子、也不超出關節極限」**。
-  * 這能有效在實地訓練前，**過濾出那些因擺放位置過於極端而不可行的 Demo Episode**，防止無效軌跡污染 Diffusion Policy 訓練集。
-
----
-
-## 四、 執行指令與操作說明
-
-### 1. 執行實體錄影資料前置驗證 (UMI JSON 檔驗證)
-若想對實體 Demo JSON 檔案進行驗證，並在過程中鎖定刀/叉抓取偏角為零度：
 ```bash
-# 驗證 Step 3 輸出的 JSON 檔（以 GUI 可視化運行，且強制刀與叉抓取 yaw 為 0）
-python scripts/datagen/validate_pybullet.py \
-    --object_poses data/YYYYMMDD-taskname/demos/mapping/object_poses.json \
-    --fix_knife_yaw \
-    --fix_fork_yaw \
+# 執行生成指令，產生 100 個完全通過運動學與碰撞驗證的 spawn 點 JSON
+# (可在主機的 .venv 中，或是 Isaac Lab 的 Docker 容器內執行)
+python scripts/datagen/generate_from_zero.py \
+    --num_demos 100 \
+    --output data/procedural_spawn/demos/mapping/object_poses.json
+```
+如果需要在本地開啟 GUI 視窗，詳細觀看 PyBullet 的碰撞與軌跡過濾過程：
+```bash
+python scripts/datagen/generate_from_zero.py \
+    --num_demos 100 \
+    --output data/procedural_spawn/demos/mapping/object_poses.json \
     --gui
-
-# 無視窗純 CPU 快速批量檢測（輸出合格與不合格 Episode 列表）
-python scripts/datagen/validate_pybullet.py \
-    --object_poses data/YYYYMMDD-taskname/demos/mapping/object_poses.json
 ```
 
-### 2. 執行隨機程序化路徑 CPU 測試
+### 2. 在 Isaac Sim 中執行重播與 LeRobot 錄製
+啟動 Isaac Lab 容器後（以 glows.ai 4090 顯卡為例）：
 ```bash
-# 帶 GUI 視覺化隨機跑 10 次，且鎖定刀的抓取 yaw 為 0
-python scripts/datagen/validate_pybullet.py --num_runs 10 --fix_knife_yaw --gui
-```
+# 1. 進入容器
+make launch-isaaclab-glowsai-4090
 
-### 3. 執行 Isaac Sim (USD場景) 完整模擬驗證
-```bash
-# 帶 GUI 模擬運行（不儲存數據，鎖定叉的抓取 yaw 為 0）
-python scripts/datagen/generate_procedural.py \
-    --task HCIS-CutleryArrangement-SingleArm-v0 \
-    --num_envs 1 \
-    --device cuda \
-    --fix_fork_yaw
-```
-
-### 4. 執行 procedural 數據生成與錄製 (LeRobot 數據集)
-```bash
-python scripts/datagen/generate_procedural.py \
+# 2. 在容器內執行錄製程式，載入剛產生的 JSON 並加上渲染加速 flag
+python scripts/datagen/generate.py \
     --task HCIS-CutleryArrangement-SingleArm-v0 \
     --num_envs 1 \
     --device cuda \
     --enable_cameras \
     --record \
     --use_lerobot_recorder \
-    --num_demos 50 \
-    --fix_knife_yaw \
-    --fix_fork_yaw \
-    --lerobot_dataset_repo_id ${HF_USER}/cutlery_procedural
+    --lerobot_dataset_repo_id XiaoPanPanKevinPan/aicapstone_group7_cutlery_v2_replay \
+    --object_poses data/procedural_spawn/demos/mapping/object_poses.json \
+    --rendering_mode performance
+```
+
+---
+
+## 三、 驗證人類操作影片位姿
+本專案的驗證腳本（`validate_pybullet.py`）亦可用來過濾人類真實操作影片所重建的初始位姿：
+```bash
+# 驗證真實人類示範的 JSON，篩選出物理上可行、不撞擊且 IK 能解的 Episode
+python scripts/datagen/validate_pybullet.py \
+    --object_poses data/AI-final-49/demos/mapping/object_poses.json
 ```

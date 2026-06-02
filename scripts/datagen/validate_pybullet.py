@@ -33,9 +33,9 @@ except ImportError:
 # Table Dimensions
 _TABLE_HEIGHT = 0.0409113
 
-_Z_SAFE = _TABLE_HEIGHT + 0.25
-_Z_GRASP = _TABLE_HEIGHT + 0.05
-_Z_RELEASE = _TABLE_HEIGHT + 0.05
+_Z_SAFE = _TABLE_HEIGHT + 0.20
+_Z_GRASP = _TABLE_HEIGHT + 0.09
+_Z_RELEASE = _TABLE_HEIGHT + 0.10
 
 _FORK_SPAWN_X = (0.35, 0.48)
 _FORK_SPAWN_Y = (-0.28, -0.18)
@@ -246,7 +246,18 @@ class PyBulletFrankaValidator:
         # Build Waypoints
         w_start = current_ee_pos
         w_hover = np.array([obj_pos[0], obj_pos[1], _Z_SAFE])
-        w_grasp = np.array([obj_pos[0], obj_pos[1], _Z_GRASP])
+        
+        # Calculate local frame offset away from the tip (towards the handle)
+        # Fork: tip points to +Y in body frame, handle to -Y. Local offset = [0.0, -0.025, 0.0]
+        # Knife: tip points to -Y in body frame, handle to +Y. Local offset = [0.0, 0.025, 0.0]
+        obj_quat_xyzw = p.getQuaternionFromEuler([0.0, 0.0, obj_yaw])
+        local_offset = [0.0, -0.025, 0.0] if obj_name == "fork" else [0.0, 0.025, 0.0]
+        
+        # Rotate offset to world frame
+        world_offset_pos, _ = p.multiplyTransforms([0, 0, 0], obj_quat_xyzw, local_offset, [0, 0, 0, 1])
+        grasp_xy = [obj_pos[0] + world_offset_pos[0], obj_pos[1] + world_offset_pos[1]]
+            
+        w_grasp = np.array([grasp_xy[0], grasp_xy[1], _Z_GRASP])
         w_lift = np.array([obj_pos[0], obj_pos[1], _Z_SAFE])
         w_transit = np.array([target_place_pos[0], target_place_pos[1], _Z_SAFE])
         w_place = np.array([target_place_pos[0], target_place_pos[1], _Z_RELEASE])
