@@ -258,6 +258,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
             device,
             obj_quat_w.dtype,
             yaw_offset=_GRASP_YAW_OFFSET,
+            phase_in_cycle=phase_in_cycle,
         )
 
         # Calculate local frame offset away from the tip (towards the handle)
@@ -459,6 +460,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         device: torch.device,
         dtype: torch.dtype,
         yaw_offset: float = 0.0,
+        phase_in_cycle: int = 0,
     ) -> torch.Tensor:
         if self._gripper_down_yaw_w is None or self._gripper_down_yaw_w.shape[0] != num_envs:
             base_yaw = _yaw_from_quat_wxyz(obj_quat_w).to(device=device, dtype=dtype) # gripper aligned with the orientation of the object
@@ -472,9 +474,17 @@ class CutleryArrangementStateMachine(StateMachineBase):
                 base_yaw + yaw_offset + self._gripper_down_yaw_offset_w
             ).clone()
 
+        if phase_in_cycle >= 4:
+            # Place phases: rotate gripper to align with the final placement orientation
+            # Fork target yaw is pi, Knife target yaw is 0.0
+            target_obj_yaw = math.pi if obj_name == _FORK_NAME else 0.0
+            yaw = torch.full((num_envs,), target_obj_yaw + yaw_offset, device=device, dtype=dtype)
+            yaw += self._gripper_down_yaw_offset_w
+        else:
+            yaw = self._gripper_down_yaw_w.to(device=device, dtype=dtype)
+
         roll = torch.full((num_envs,), _GRIPPER_DOWN_ROLL_W, device=device, dtype=dtype)
         pitch = torch.full((num_envs,), _GRIPPER_DOWN_PITCH_W, device=device, dtype=dtype)
-        yaw = self._gripper_down_yaw_w.to(device=device, dtype=dtype)
         return quat_from_euler_xyz(roll, pitch, yaw)
 
     # ------------------------------------------------------------------
