@@ -290,6 +290,22 @@ class CutleryArrangementStateMachine(StateMachineBase):
 
         phase_in_cycle = self._event % _PHASES_PER_OBJECT
 
+        # Fetch current joint 7 position and end-effector yaw
+        q7 = robot.data.joint_pos[:, self._arm_joint_ids[6]]
+        ee_yaw = _yaw_from_quat_wxyz(self._ee_quat_w(robot))
+
+        # Fetch Joint 7 limits dynamically
+        joint_pos_limits = getattr(robot.data, "soft_joint_pos_limits", None)
+        if joint_pos_limits is None:
+            joint_pos_limits = getattr(robot.data, "joint_pos_limits", None)
+        if joint_pos_limits is not None:
+            q7_limits = joint_pos_limits[:, self._arm_joint_ids[6], :] # shape (num_envs, 2)
+            q7_lower = q7_limits[:, 0]
+            q7_upper = q7_limits[:, 1]
+        else:
+            q7_lower = torch.full_like(q7, -2.8973)
+            q7_upper = torch.full_like(q7, 2.8973)
+
         target_quat_w = self._gripper_down_quat_w(
             obj_quat_w_ref,
             obj_name,
@@ -298,6 +314,10 @@ class CutleryArrangementStateMachine(StateMachineBase):
             obj_quat_w_ref.dtype,
             yaw_offset=_GRASP_YAW_OFFSET,
             phase_in_cycle=phase_in_cycle,
+            q7=q7,
+            ee_yaw=ee_yaw,
+            q7_lower=q7_lower,
+            q7_upper=q7_upper,
         )
 
         # Calculate local frame offset away from the tip (towards the handle)
@@ -619,6 +639,10 @@ class CutleryArrangementStateMachine(StateMachineBase):
         dtype: torch.dtype,
         yaw_offset: float = 0.0,
         phase_in_cycle: int = 0,
+        q7: torch.Tensor | None = None,
+        ee_yaw: torch.Tensor | None = None,
+        q7_lower: torch.Tensor | None = None,
+        q7_upper: torch.Tensor | None = None,
     ) -> torch.Tensor:
         if self._gripper_down_yaw_w is None or self._gripper_down_yaw_w.shape[0] != num_envs:
             base_yaw = _yaw_from_quat_wxyz(obj_quat_w).to(device=device, dtype=dtype) # gripper aligned with the orientation of the object
@@ -649,6 +673,28 @@ class CutleryArrangementStateMachine(StateMachineBase):
             yaw += self._gripper_down_yaw_offset_w
         else:
             yaw = self._gripper_down_yaw_w.to(device=device, dtype=dtype)
+
+        # Joint 7 limit prevention: if shortest path rotates past limits, guide in the opposite direction
+        if q7 is not None and ee_yaw is not None and q7_lower is not None and q7_upper is not None:
+            # Shortest-path yaw delta the controller wants to apply
+            delta_yaw = (yaw - ee_yaw + math.pi) % (2.0 * math.pi) - math.pi
+            
+            # Predict resulting q7 position
+            predicted_q7 = q7 + delta_yaw
+            
+            violates_upper = predicted_q7 > q7_upper
+            violates_lower = predicted_q7 < q7_lower
+            
+            # Temporarily steer away from limits by 1.0 rad (clamped to max step rot by controller)
+            yaw = torch.where(
+                violates_upper,
+                ee_yaw - 1.0,
+                torch.where(
+                    violates_lower,
+                    ee_yaw + 1.0,
+                    yaw
+                )
+            )
 
         roll = torch.full((num_envs,), _GRIPPER_DOWN_ROLL_W, device=device, dtype=dtype)
         pitch = torch.full((num_envs,), _GRIPPER_DOWN_PITCH_W, device=device, dtype=dtype)

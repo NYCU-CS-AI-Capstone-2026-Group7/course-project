@@ -419,6 +419,27 @@ class PyBulletFrankaValidator:
                     targetOrientation=p.getQuaternionFromEuler([math.pi, 0, target_yaw_val + math.pi/2])
                 )
                 
+                # Dynamic joint 7 limit prevention: if IK output violates limit, steer yaw in opposite direction
+                q7_val = joint_angles[6]
+                lower_limit, upper_limit = self.joint_limits[6]
+                if q7_val > upper_limit or q7_val < lower_limit:
+                    ee_state = p.getLinkState(self.robot_id, self.ee_index)
+                    ee_quat = ee_state[5]
+                    ee_euler = p.getEulerFromQuaternion(ee_quat)
+                    ee_yaw = ee_euler[2] - math.pi/2
+                    
+                    if q7_val > upper_limit:
+                        adjusted_yaw = ee_yaw - 0.08
+                    else:
+                        adjusted_yaw = ee_yaw + 0.08
+                        
+                    joint_angles = p.calculateInverseKinematics(
+                        self.robot_id,
+                        self.ee_index,
+                        targetPosition=list(target_pos),
+                        targetOrientation=p.getQuaternionFromEuler([math.pi, 0, adjusted_yaw + math.pi/2])
+                    )
+                
                 # Apply joint angles
                 if self.arm_physics:
                     for j_idx, angle in enumerate(joint_angles[:7]):
