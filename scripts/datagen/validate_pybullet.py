@@ -87,7 +87,7 @@ def yaw_from_quat_wxyz(quat_wxyz):
 class PyBulletFrankaValidator:
     """Validator using PyBullet physics engine for lightweight CPU simulations."""
 
-    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0, allow_plate_collision=False):
+    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0, allow_plate_collision=False, arm_physics=False):
         self.use_gui = use_gui
         self.verbose = verbose
         self.sleep_time = 1.0 / fps if fps > 0 else 0.0
@@ -95,6 +95,7 @@ class PyBulletFrankaValidator:
         self.reconnect_interval = reconnect_interval
         self.last_reconnect_time = time.time()
         self.allow_plate_collision = allow_plate_collision
+        self.arm_physics = arm_physics
         self.objects = {}
         
         self.initialize_pybullet()
@@ -146,6 +147,12 @@ class PyBulletFrankaValidator:
             joint_info = p.getJointInfo(self.robot_id, i)
             parent_link = joint_info[16]
             self.parent_map[i] = parent_link
+            
+        # Fetch joint limits for joints 0-6 (Franka arm joints)
+        self.joint_limits = []
+        for i in range(7):
+            joint_info = p.getJointInfo(self.robot_id, i)
+            self.joint_limits.append((joint_info[8], joint_info[9]))
 
     def reconnect(self):
         # Get current camera pose in GUI mode before disconnecting to preserve user view
@@ -412,9 +419,31 @@ class PyBulletFrankaValidator:
                     targetOrientation=p.getQuaternionFromEuler([math.pi, 0, target_yaw_val + math.pi/2])
                 )
                 
-                # Apply joint angles kinematically
-                for j_idx, angle in enumerate(joint_angles[:7]):
-                    p.resetJointState(self.robot_id, j_idx, angle)
+                # Apply joint angles
+                if self.arm_physics:
+                    for j_idx, angle in enumerate(joint_angles[:7]):
+                        lower, upper = self.joint_limits[j_idx]
+                        clamped_angle = max(lower, min(upper, angle))
+                        p.setJointMotorControl2(
+                            bodyUniqueId=self.robot_id,
+                            jointIndex=j_idx,
+                            controlMode=p.POSITION_CONTROL,
+                            targetPosition=clamped_angle,
+                            force=200.0,
+                            maxVelocity=2.0
+                        )
+                    # Run physics steps to let the arm move to target
+                    physics_steps = 20
+                    for _ in range(physics_steps):
+                        p.stepSimulation()
+                        if self.use_gui:
+                            time.sleep(self.sleep_time / physics_steps)
+                else:
+                    # Apply joint angles kinematically (clamping to joint limits to match Isaac Sim)
+                    for j_idx, angle in enumerate(joint_angles[:7]):
+                        lower, upper = self.joint_limits[j_idx]
+                        clamped_angle = max(lower, min(upper, angle))
+                        p.resetJointState(self.robot_id, j_idx, clamped_angle)
                     
                 if has_grasped:
                     if grasp_constraint_id is None:
@@ -446,16 +475,17 @@ class PyBulletFrankaValidator:
                             childFrameOrientation=[0, 0, 0]
                         )
                     
-                    # Manually teleport object to match gripper exactly (kinematic tracking)
-                    # This prevents springy constraints from twisting/tilting under high IK step forces.
-                    ee_state = p.getLinkState(self.robot_id, self.ee_index)
-                    ee_pos, ee_quat = ee_state[4], ee_state[5]
-                    target_obj_pos, target_obj_quat = p.multiplyTransforms(ee_pos, ee_quat, rel_pos, rel_quat)
-                    
-                    # Flatten the object orientation to roll = 0, pitch = 0 to prevent tilt propagation
-                    target_e = p.getEulerFromQuaternion(target_obj_quat)
-                    target_obj_quat_flat = p.getQuaternionFromEuler([0.0, 0.0, target_e[2]])
-                    p.resetBasePositionAndOrientation(obj_body_id, target_obj_pos, target_obj_quat_flat)
+                    if not self.arm_physics:
+                        # Manually teleport object to match gripper exactly (kinematic tracking)
+                        # This prevents springy constraints from twisting/tilting under high IK step forces.
+                        ee_state = p.getLinkState(self.robot_id, self.ee_index)
+                        ee_pos, ee_quat = ee_state[4], ee_state[5]
+                        target_obj_pos, target_obj_quat = p.multiplyTransforms(ee_pos, ee_quat, rel_pos, rel_quat)
+                        
+                        # Flatten the object orientation to roll = 0, pitch = 0 to prevent tilt propagation
+                        target_e = p.getEulerFromQuaternion(target_obj_quat)
+                        target_obj_quat_flat = p.getQuaternionFromEuler([0.0, 0.0, target_e[2]])
+                        p.resetBasePositionAndOrientation(obj_body_id, target_obj_pos, target_obj_quat_flat)
                 else:
                     if grasp_constraint_id is not None:
                         # Release event! Remove constraint
@@ -614,6 +644,11 @@ def main():
         default=10.0,
         help="PyBullet GUI reconnection interval in seconds to clear rendering cache (default: 10.0s).",
     )
+    parser.add_argument(
+        "--arm-physics",
+        action="store_true",
+        help="Enable physical joint-motor control instead of kinematic joint resets."
+    )
     args = parser.parse_args()
     
     validator = PyBulletFrankaValidator(
@@ -622,7 +657,8 @@ def main():
         fps=args.fps, 
         min_dist=args.min_dist,
         reconnect_interval=args.reconnect_interval,
-        allow_plate_collision=args.allow_plate_collision
+        allow_plate_collision=args.allow_plate_collision,
+        arm_physics=args.arm_physics
     )
     validator.fix_knife_yaw = args.fix_knife_yaw
     validator.fix_fork_yaw = args.fix_fork_yaw

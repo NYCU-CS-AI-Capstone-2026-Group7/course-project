@@ -159,6 +159,7 @@ python -c "import json; open('data/merged_object_poses.json', 'w').write(json.du
 | **夾取失敗判定**<br>*(Grasp Failure)* | **有早期中斷**<br>在 Lift 階段結束時（即 Event 3 或 11），會檢查刀叉的 Z 軸高度是否低於 `0.08 m`。若未成功提起，視為夾取失敗，**立即中斷並跳過此 Episode**。 | **無中斷 (物理上強制夾住)**<br>使用 PyBullet 的 `p.createConstraint(..., p.JOINT_FIXED)` 強行將刀叉固定在夾爪上進行運動學仿真，故無滑落問題。 |
 | **物體掉落判定**<br>*(Object Fall)* | **全程持續偵測**<br>在整個模擬期間，隨時監測桌上所有任務物件的 Z 軸高度。一旦任何物件低於桌子（跌落），**立即中斷並跳至下一個 Pose**。 | **僅初始化階段偵測**<br>僅在初始放置 settling 階段 (前 100 步) 檢查刀叉 Z 軸是否低於 `_TABLE_SURFACE_Z - 0.01`。一旦掉落就回傳 `False` 中斷，後續運動過程則不重複偵測。 |
 | **碰撞偵測判定**<br>*(Collision)* | **不會因為碰撞中斷**<br>允許手臂在運作中與桌子、盤子或刀叉產生摩擦碰撞（只要不把東西撞落桌子），模擬會持續進行，最後才透過位置檢查成功與否。 | **瞬間中斷**<br>在路徑插補的每一步，都會呼叫 `performCollisionDetection()`。一旦偵測到**非預期碰撞**（如自我碰撞、物件碰撞、手臂撞桌子），**立即回傳 `False` 判定此 Pose 失敗**。 |
+| **關節極限判定**<br>*(Joint Limits)* | **閉環限幅與超時中斷**<br>解算 IK 後會調用 `_clamp_arm_joint_pos` 對角度進行 Clamp。若目標姿態受限於關節極限而無法到達，將導致位置/角度誤差無法收斂，最終觸發 Phase 超時中斷。 | **對齊限幅 (Clamp) 處理**<br>在插補每步解出 IK 後，將關節角度限制在 URDF 物理極限內。若因限幅導致手腕無法轉到位或距離不夠，後續的碰撞檢測或落點穩定度檢查仍會自然攔截，但不會在解算瞬間直接終止。 |
 | **超時限制判定**<br>*(Timeout)* | **狀態機與 Episode 總步數限制**<br>當各 Phase 到達我們設定的閉環最大步數超時限制（例如 Movement 1.5 倍，下降 22 步）時會跳過並印出診斷 Log。此外，若總步數超過 `MAX_STEPS` 亦會中斷。 | **路徑節點數限制**<br>插補軌跡以固定的 Segment Steps (如 30 或 40 步) 走完。如果在這些步數內 IK 找不到解，或者是關節限位導致自我碰撞，會直接被碰撞檢測觸發 Fail。 |
 
 ---
@@ -199,4 +200,21 @@ python -c "import json; open('data/merged_object_poses.json', 'w').write(json.du
     * **Phase 5 (Lower to release)**：垂直下放至擺放高度，夾爪保持閉合（運動結束即切換）。
     * **Phase 6 (Open gripper to release)**：原地保持完全靜止，夾爪張開釋放（開環計時 25 步，讓物件完全平穩）。
     * **Phase 7 (Retreat upward)**：空夾爪垂直升起至安全高度（Z = 22 cm），避免橫向橫掃時撞翻已擺好的餐具。
+
+---
+
+## 八、 PyBullet 物理手臂驗證機制 (`--arm-physics`)
+
+為了在高效率的「純幾何運動學預篩選」與高真實度的「關節力矩/物理阻尼模擬」之間取得完美平衡，我們在 `generate_from_zero.py` 與 `validate_pybullet.py` 中新增了 `--arm-physics` 參數：
+
+1. **未開啟 `--arm-physics`（預設：運動學預篩選模式）**：
+   * **控制方式**：使用 `p.resetJointState()` 直接將手臂關節瞬間傳送（Teleport）至逆運動學（IK）解出的目標角度。
+   * **物體處理**：在夾取狀態下，被夾物體會使用 Kinematic Teleportation 強制與夾爪完美對齊（Flattened mapping），消除任何物理滑動。
+   * **優點**：執行速度**極快**（單個 Episode 幾毫秒即可完成），非常適合用於排除明顯的碰撞與可達性（Reachability）極限，以達到超高速的 Procedural spawning 預過濾。
+
+2. **開啟 `--arm-physics`（物理手臂驗證模式）**：
+   * **控制方式**：在每個插值步數（Interpolation step）中，不使用瞬間傳送，而是調用 `p.setJointMotorControl2(..., controlMode=p.POSITION_CONTROL, force=200.0, maxVelocity=2.0)` 對 7 個關節進行**馬達位置控制**，並在每個插值格點間運行 20 步物理引擎疊代 `p.stepSimulation()`。
+   * **物體處理**：完全交給 PyBullet 的物理約束 `p.createConstraint(jointType=p.JOINT_FIXED)` 以及重力引擎。不進行手動的位置微調對齊，真實反應物體在夾取、搬運時的力學擺動與微小滑移。
+   * **優點**：能夠檢驗出因為手臂「動態慣性」、「速度/力矩極限跟不上」或是「搬運時物理摩擦/滑落」所造成的潛在不穩定，確保過濾出的 Poses 在物理上極為可靠。
+
 

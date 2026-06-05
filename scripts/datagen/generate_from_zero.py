@@ -105,6 +105,11 @@ def main():
         action="store_true",
         help="Allow cutlery (fork/knife) to touch or collide with the plate without failing validation."
     )
+    parser.add_argument(
+        "--arm-physics",
+        action="store_true",
+        help="Enable physical joint-motor control in PyBullet validator."
+    )
     args = parser.parse_args()
 
     output_path = Path(args.output)
@@ -137,7 +142,8 @@ def main():
         min_dist=args.min_dist, 
         verbose=args.verbose,
         reconnect_interval=args.reconnect_interval,
-        allow_plate_collision=args.allow_plate_collision
+        allow_plate_collision=args.allow_plate_collision,
+        arm_physics=args.arm_physics
     )
 
     episodes = []
