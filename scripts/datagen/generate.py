@@ -300,6 +300,36 @@ def _on_episode_done(
         print("Success check failed:", e)
         success = False
 
+    if success and args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
+        import math
+        try:
+            # 1. Verify Knife Yaw (expected 0.0)
+            k_quat = env.scene["knife"].data.root_quat_w[0]
+            k_w, k_x, k_y, k_z = k_quat[0].item(), k_quat[1].item(), k_quat[2].item(), k_quat[3].item()
+            k_siny = 2.0 * (k_w * k_z + k_x * k_y)
+            k_cosy = 1.0 - 2.0 * (k_y * k_y + k_z * k_z)
+            k_yaw = math.atan2(k_siny, k_cosy)
+            k_diff = (k_yaw - 0.0 + math.pi) % (2.0 * math.pi) - math.pi
+            k_diff_deg = abs(math.degrees(k_diff))
+
+            # 2. Verify Fork Yaw (expected pi)
+            f_quat = env.scene["fork"].data.root_quat_w[0]
+            f_w, f_x, f_y, f_z = f_quat[0].item(), f_quat[1].item(), f_quat[2].item(), f_quat[3].item()
+            f_siny = 2.0 * (f_w * f_z + f_x * f_y)
+            f_cosy = 1.0 - 2.0 * (f_y * f_y + f_z * f_z)
+            f_yaw = math.atan2(f_siny, f_cosy)
+            f_diff = (f_yaw - math.pi + math.pi) % (2.0 * math.pi) - math.pi
+            f_diff_deg = abs(math.degrees(f_diff))
+
+            if k_diff_deg > 15.0 or f_diff_deg > 15.0:
+                print(f"[INFO] Success check failed due to yaw mismatch:")
+                print(f"  - Knife yaw: {math.degrees(k_yaw):.1f}° (diff: {k_diff_deg:.1f}°) " + ("FAIL (>15°)" if k_diff_deg > 15.0 else "OK"))
+                print(f"  - Fork yaw: {math.degrees(f_yaw):.1f}° (diff: {f_diff_deg:.1f}°) " + ("FAIL (>15°)" if f_diff_deg > 15.0 else "OK"))
+                success = False
+        except Exception as e:
+            print("Yaw verification failed during success check:", e)
+            success = False
+
     print("Episode success!" if success else "Episode failed!")
 
     if start_record_state:
@@ -520,6 +550,7 @@ def main():
 
                     # Early termination optimization (only for failed grasp, success is validated after settle)
                     if args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
+                        import math
                         # event == 3 is right after knife lift phase; event == 11 is right after fork lift phase
                         if (sm._event == 3 or sm._event == 11) and sm._step_count == 150:
                             target_obj = "knife" if sm._event == 3 else "fork"
@@ -527,6 +558,33 @@ def main():
                             obj_z = env.scene[target_obj].data.root_pos_w[0, 2].item() - env.scene.env_origins[0, 2].item()
                             if obj_z < 0.08: # Normal lifted height is ~0.20+, if < 0.08 it means grasp failed
                                 print(f"[INFO] Early abort: Failed to grasp {target_obj} (z={obj_z:.3f} < 0.08).")
+                                sm._episode_done = True
+                        # 1. Knife placed (event 8, step 0): check knife yaw
+                        elif sm._event == 8 and sm._step_count == 0:
+                            quat = env.scene["knife"].data.root_quat_w[0]
+                            w, x, y, z = quat[0].item(), quat[1].item(), quat[2].item(), quat[3].item()
+                            siny_cosp = 2.0 * (w * z + x * y)
+                            cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+                            actual_yaw = math.atan2(siny_cosp, cosy_cosp)
+                            expected_yaw = 0.0
+                            diff = (actual_yaw - expected_yaw + math.pi) % (2.0 * math.pi) - math.pi
+                            diff_deg = abs(math.degrees(diff))
+                            if diff_deg > 15.0:
+                                print(f"[INFO] Early abort: Knife yaw mismatch (yaw={math.degrees(actual_yaw):.1f}° | diff={diff_deg:.1f}° > 15.0°).")
+                                sm._episode_done = True
+                        # 2. Fork placed (event 16, step 0): check fork yaw
+                        elif sm._event == 16 and sm._step_count == 0:
+                            quat = env.scene["fork"].data.root_quat_w[0]
+                            w, x, y, z = quat[0].item(), quat[1].item(), quat[2].item(), quat[3].item()
+                            siny_cosp = 2.0 * (w * z + x * y)
+                            cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+                            actual_yaw = math.atan2(siny_cosp, cosy_cosp)
+                            expected_yaw = math.pi
+                            diff = (actual_yaw - expected_yaw + math.pi) % (2.0 * math.pi) - math.pi
+                            diff_deg = abs(math.degrees(diff))
+                            if diff_deg > 15.0:
+                                print(f"[INFO] Early abort: Fork yaw mismatch (yaw={math.degrees(actual_yaw):.1f}° | diff={diff_deg:.1f}° > 15.0°).")
+                                sm._event = 15  # Set back to 15 so we skip the 300-step settle and end immediately
                                 sm._episode_done = True
 
                     if fall_check_object_names and _any_object_fell(
