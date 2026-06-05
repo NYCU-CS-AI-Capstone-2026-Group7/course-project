@@ -83,7 +83,7 @@ _PLACE_X_SIGNS = (+1.0, -1.0)  # fork → +x of plate, knife → -x of plate
 _STEP_SCALE_FACTOR = 1.0
 _MAX_STEP_SCALE_FACTOR = 1.5
 _MIN_STEP_SCALE_FACTOR = 0.1
-_PHASE_DURATIONS_PER_OBJECT = tuple(int(d * _STEP_SCALE_FACTOR) for d in (270, 130, 20, 160, 255, 15, 25, 30))
+_PHASE_DURATIONS_PER_OBJECT = tuple(int(d * _STEP_SCALE_FACTOR) for d in (270, 130, 20, 160, 255, 53, 25, 30))
 _PHASES_PER_OBJECT = len(_PHASE_DURATIONS_PER_OBJECT)
 
 _PHASE_NAMES = {
@@ -419,6 +419,16 @@ class CutleryArrangementStateMachine(StateMachineBase):
         epsilon_pos = self.EPSILON_POS
         epsilon_rot = self.EPSILON_ROT
         
+        phase_in_cycle = self._event % _PHASES_PER_OBJECT
+        if phase_in_cycle == 1:
+            # 2.2: Approach down to object
+            # Relax position tolerance slightly to 0.045m to handle table contact early and avoid stuck timeouts
+            epsilon_pos = 0.045
+        elif phase_in_cycle == 7:
+            # Phase 7: Retreat upward
+            # Relax rotation tolerance since it is just an empty gripper retreating
+            epsilon_rot = 0.8
+            
         arrived = (pos_error <= epsilon_pos) & (rot_error <= epsilon_rot)
         return arrived
 
@@ -484,12 +494,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
             else:
                 # Movement phases: 0, 1, 3, 4, 5, 7
                 arrived = self.check_arrival(env).all()
-                if phase_in_cycle == 5:
-                    min_steps = max(5, int(5 * _STEP_SCALE_FACTOR))
-                    max_steps = int(35 * _STEP_SCALE_FACTOR * _MAX_STEP_SCALE_FACTOR)
-                else:
-                    min_steps = max(10, int(_MIN_STEP_SCALE_FACTOR * default_duration))
-                    max_steps = int(_MAX_STEP_SCALE_FACTOR * default_duration)
+                min_steps = max(10, int(_MIN_STEP_SCALE_FACTOR * default_duration))
+                max_steps = int(_MAX_STEP_SCALE_FACTOR * default_duration)
                 
                 # Check if arrived after minimum steps or if we timed out
                 if arrived and self._step_count >= min_steps:
