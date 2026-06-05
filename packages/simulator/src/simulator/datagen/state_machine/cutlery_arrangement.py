@@ -84,6 +84,16 @@ _TIME_SCALE_FACTOR = 1.5
 _PHASE_DURATIONS_PER_OBJECT = tuple(int(d * _TIME_SCALE_FACTOR) for d in (180, 130, 20, 160, 170, 40, 30))
 _PHASES_PER_OBJECT = len(_PHASE_DURATIONS_PER_OBJECT)
 
+_PHASE_NAMES = {
+    0: "Move above object (Hover)",
+    1: "Approach down to object",
+    2: "Close gripper to grasp",
+    3: "Lift object upward",
+    4: "Move above target position (beside plate)",
+    5: "Lower to release",
+    6: "Retreat upward"
+}
+
 
 def _constant_gripper(num_envs: int, device: torch.device, value: float) -> torch.Tensor:
     return torch.full((num_envs, 1), value, device=device)
@@ -401,6 +411,39 @@ class CutleryArrangementStateMachine(StateMachineBase):
         arrived = (pos_error <= epsilon_pos) & (rot_error <= epsilon_rot)
         return arrived
 
+    def _log_timeout_diagnostics(self, env, phase_name: str, max_steps: int) -> None:
+        if self._last_target_pos_w is None or self._last_target_quat_w is None:
+            return
+            
+        robot = env.scene["robot"]
+        ee_pos = self._ee_pos_w(robot)
+        ee_quat = self._ee_quat_w(robot)
+        obj_name = _PICK_ORDER[self._current_object_idx]
+        
+        # Calculate errors for env 0 (assuming single env or reporting the first env)
+        target_pos = self._last_target_pos_w[0]
+        actual_pos = ee_pos[0]
+        target_quat = self._last_target_quat_w[0]
+        actual_quat = ee_quat[0]
+        
+        pos_error = torch.norm(actual_pos - target_pos).item()
+        
+        dot_product = torch.dot(actual_quat, target_quat).abs().clamp(0.0, 1.0)
+        rot_error_rad = (2.0 * torch.acos(dot_product)).item()
+        rot_error_deg = math.degrees(rot_error_rad)
+        
+        epsilon_pos = self.EPSILON_POS
+        epsilon_rot = self.EPSILON_ROT
+        epsilon_rot_deg = math.degrees(epsilon_rot)
+        
+        print(f"\033[93m[StateMachine] [TIMEOUT] Event {self._event} ({phase_name}) of object '{obj_name}' timed out at step {self._step_count} (max steps: {max_steps})\033[0m")
+        print(f"  -> \033[91mPosition mismatch\033[0m: Error = {pos_error:.4f} m (Tolerance: {epsilon_pos:.4f} m)")
+        print(f"     Target: {target_pos.tolist()}")
+        print(f"     Actual: {actual_pos.tolist()}")
+        print(f"  -> \033[91mRotation mismatch\033[0m: Error = {rot_error_deg:.2f}° / {rot_error_rad:.4f} rad (Tolerance: {epsilon_rot_deg:.2f}° / {epsilon_rot:.4f} rad)")
+        print(f"     Target Quat (wxyz): {target_quat.tolist()}")
+        print(f"     Actual Quat (wxyz): {actual_quat.tolist()}")
+
     def advance(self, env=None) -> None:
         if self._episode_done:
             return
@@ -437,7 +480,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
                         self._phase5_lowered = True
                         self._step_count = 0
                     elif self._step_count >= max_steps:
-                        print(f"[StateMachine] [TIMEOUT] Event {self._event} (Phase 5 Lowering) of object '{obj_name}' timed out at step {self._step_count} (max steps: {max_steps})")
+                        self._log_timeout_diagnostics(env, "Lowering to release", max_steps)
                         self._phase5_lowered = True
                         self._step_count = 0
                 else:
@@ -459,7 +502,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
                     self._event += 1
                     self._step_count = 0
                 elif self._step_count >= max_steps:
-                    print(f"[StateMachine] [TIMEOUT] Event {self._event} (Phase {phase_in_cycle}) of object '{obj_name}' timed out at step {self._step_count} (max steps: {max_steps})")
+                    phase_name = _PHASE_NAMES.get(phase_in_cycle, f"Phase {phase_in_cycle}")
+                    self._log_timeout_diagnostics(env, phase_name, max_steps)
                     self._event += 1
                     self._step_count = 0
 
