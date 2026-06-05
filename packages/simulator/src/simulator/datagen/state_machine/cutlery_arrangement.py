@@ -157,6 +157,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
     """
 
     MAX_STEPS: int = len(_PICK_ORDER) * sum(_PHASE_DURATIONS_PER_OBJECT) + 100
+    EPSILON_POS: float = 0.015
+    EPSILON_ROT: float = 0.25
 
     def __init__(self) -> None:
         self._step_count: int = 0
@@ -173,6 +175,10 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._current_object_idx: int = 0
         self._event: int = 0
         self._events_dt: list[int] = list(_PHASE_DURATIONS_PER_OBJECT) * len(_PICK_ORDER)
+        self._last_target_pos_w: torch.Tensor | None = None
+        self._last_target_quat_w: torch.Tensor | None = None
+        self._phase5_lowered: bool = False
+        self._last_advance_with_env: bool = False
 
     # ------------------------------------------------------------------
     # StateMachineBase interface
@@ -294,6 +300,9 @@ class CutleryArrangementStateMachine(StateMachineBase):
         else:
             target_pos_w, gripper_cmd = self._phase_retreat(place_target_w, num_envs, device)
 
+        self._last_target_pos_w = target_pos_w.clone()
+        self._last_target_quat_w = target_quat_w.clone()
+
         return self._joint_position_franka_action(env, target_pos_w, target_quat_w, gripper_cmd)
 
     # ------------------------------------------------------------------
@@ -335,8 +344,12 @@ class CutleryArrangementStateMachine(StateMachineBase):
     def _phase_lower_to_release(self, place_pos_w, num_envs, device):
         target = place_pos_w.clone()
         target[:, 2] += _RELEASE_Z_OFFSET
-        # Lower first (15 steps), then open gripper (25 steps) to release before retreating
-        if self._step_count < 15:
+        
+        # Backward-compatible check: if we advanced without env, use time-based step count,
+        # otherwise use closed-loop _phase5_lowered flag
+        is_lowered = (self._step_count >= 15) if not getattr(self, "_last_advance_with_env", False) else self._phase5_lowered
+        
+        if not is_lowered:
             return target, _constant_gripper(num_envs, device, _GRIPPER_CLOSE)
         else:
             return target, _constant_gripper(num_envs, device, _GRIPPER_OPEN)
@@ -350,17 +363,93 @@ class CutleryArrangementStateMachine(StateMachineBase):
     # Timeline
     # ------------------------------------------------------------------
 
-    def advance(self) -> None:
+    def check_arrival(self, env) -> torch.Tensor:
+        """Checks if the end-effector has arrived at the target position and orientation.
+        
+        Returns a boolean tensor of shape (num_envs,) indicating whether each environment's
+        end-effector is within the tolerance thresholds.
+        """
+        if self._last_target_pos_w is None or self._last_target_quat_w is None:
+            return torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+            
+        robot = env.scene["robot"]
+        ee_pos = self._ee_pos_w(robot)
+        ee_quat = self._ee_quat_w(robot)
+        
+        # Position error: Euclidean distance
+        pos_error = torch.norm(ee_pos - self._last_target_pos_w, dim=-1)
+        
+        # Rotation error: Angle between quaternions in radians
+        dot_product = torch.sum(ee_quat * self._last_target_quat_w, dim=-1).abs()
+        dot_product = torch.clamp(dot_product, 0.0, 1.0)
+        rot_error = 2.0 * torch.acos(dot_product)
+        
+        epsilon_pos = self.EPSILON_POS
+        epsilon_rot = self.EPSILON_ROT
+        
+        arrived = (pos_error <= epsilon_pos) & (rot_error <= epsilon_rot)
+        return arrived
+
+    def advance(self, env=None) -> None:
         if self._episode_done:
             return
 
         self._step_count += 1
-        if self._step_count < self._events_dt[self._event]:
-            return
+        
+        if env is None:
+            self._last_advance_with_env = False
+            if self._step_count < self._events_dt[self._event]:
+                return
+            self._event += 1
+            self._step_count = 0
+        else:
+            self._last_advance_with_env = True
+            phase_in_cycle = self._event % _PHASES_PER_OBJECT
+            default_duration = self._events_dt[self._event]
+            obj_name = _PICK_ORDER[self._current_object_idx]
+            
+            if phase_in_cycle == 2:
+                # Phase 2: Close gripper to grasp (purely time-based finger closing)
+                if self._step_count < default_duration:
+                    return
+                self._event += 1
+                self._step_count = 0
+            elif phase_in_cycle == 5:
+                # Phase 5: Lower and release (two subphases)
+                if not self._phase5_lowered:
+                    # Subphase 5.1: Lowering
+                    arrived = self.check_arrival(env).all()
+                    # Enforce a minimum of 5 steps to allow motion, and maximum 35 steps timeout
+                    if arrived and self._step_count >= 5:
+                        self._phase5_lowered = True
+                        self._step_count = 0
+                    elif self._step_count >= 35:
+                        print(f"[StateMachine] [TIMEOUT] Event {self._event} (Phase 5 Lowering) of object '{obj_name}' timed out at step {self._step_count} (max steps: 35)")
+                        self._phase5_lowered = True
+                        self._step_count = 0
+                else:
+                    # Subphase 5.2: Opening gripper to release (purely time-based 25 steps)
+                    if self._step_count < 25:
+                        return
+                    self._event += 1
+                    self._step_count = 0
+                    self._phase5_lowered = False
+            else:
+                # Movement phases: 0, 1, 3, 4, 6
+                arrived = self.check_arrival(env).all()
+                min_steps = max(10, int(0.10 * default_duration))
+                max_steps = int(1.5 * default_duration)
+                
+                # Check if arrived after minimum steps or if we timed out
+                if arrived and self._step_count >= min_steps:
+                    self._event += 1
+                    self._step_count = 0
+                elif self._step_count >= max_steps:
+                    print(f"[StateMachine] [TIMEOUT] Event {self._event} (Phase {phase_in_cycle}) of object '{obj_name}' timed out at step {self._step_count} (max steps: {max_steps})")
+                    self._event += 1
+                    self._step_count = 0
 
-        self._event += 1
-        self._step_count = 0
-
+        # Post-event transition check
         if self._event >= len(self._events_dt):
             self._episode_done = True
             return
@@ -371,6 +460,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
             self._initial_ee_pos_w = None
             self._gripper_down_yaw_w = None
             self._gripper_down_yaw_offset_w = None
+            self._phase5_lowered = False
 
     def reset(self) -> None:
         self._step_count = 0
@@ -380,6 +470,10 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._initial_ee_pos_w = None
         self._gripper_down_yaw_w = None
         self._gripper_down_yaw_offset_w = None
+        self._last_target_pos_w = None
+        self._last_target_quat_w = None
+        self._phase5_lowered = False
+        self._last_advance_with_env = False
 
     # ------------------------------------------------------------------
     # IK / control helpers (same as CupStackingStateMachine)

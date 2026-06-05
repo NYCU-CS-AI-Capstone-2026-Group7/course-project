@@ -516,7 +516,7 @@ def main():
                     sm.pre_step(env)
                     actions = sm.get_action(env)
                     env.step(actions)
-                    sm.advance()
+                    sm.advance(env)
 
                     # Early termination optimization (only for failed grasp, success is validated after settle)
                     if args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
