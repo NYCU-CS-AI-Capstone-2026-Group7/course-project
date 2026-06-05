@@ -14,7 +14,6 @@ Usage:
 import argparse
 import json
 import math
-import random
 import sys
 from pathlib import Path
 
@@ -28,32 +27,16 @@ if simulator_src.exists() and str(simulator_src) not in sys.path:
     sys.path.insert(0, str(simulator_src))
 
 try:
-    from scripts.datagen.validate_pybullet import PyBulletFrankaValidator
+    from scripts.datagen.validate_pybullet import (
+        PyBulletFrankaValidator,
+        FORK_Z,
+        KNIFE_Z,
+        normalize_angle,
+    )
 except ImportError:
     raise ImportError(
         "Could not import PyBulletFrankaValidator. Ensure scripts/datagen/validate_pybullet.py exists."
     )
-
-
-def _euler_xyz_to_quat_wxyz(roll: float, pitch: float, yaw: float) -> tuple[float, float, float, float]:
-    """Roll, pitch, yaw to quaternion (w, x, y, z)."""
-    cy = math.cos(yaw * 0.5)
-    sy = math.sin(yaw * 0.5)
-    cp = math.cos(pitch * 0.5)
-    sp = math.sin(pitch * 0.5)
-    cr = math.cos(roll * 0.5)
-    sr = math.sin(roll * 0.5)
-
-    w = cr * cp * cy + sr * sp * sy
-    x = sr * cp * cy - cr * sp * sy
-    y = cr * sp * cy + sr * cp * sy
-    z = cr * cp * sy - sr * sp * cy
-    return (w, x, y, z)
-
-
-def normalize_angle(angle: float) -> float:
-    """Normalize angle to [-pi, pi]."""
-    return (angle + math.pi) % (2.0 * math.pi) - math.pi
 
 
 def main():
@@ -115,13 +98,8 @@ def main():
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Spawn area constants (matching validate_pybullet.py)
-    _TABLE_SURFACE_Z = 0.5
-    _CUTLERY_SPAWN_X = (0.25, 0.55)
-    _CUTLERY_SPAWN_Y = (-0.60, -0.20)
+    # Spawn area constants (imported from validate_pybullet.py)
     _MIN_SPAWN_DIST = args.min_dist
-    _FORK_Z = _TABLE_SURFACE_Z + 0.018
-    _KNIFE_Z = _TABLE_SURFACE_Z + 0.011
 
     # Anchor constants used by simulator loader to reconstruct world poses
     # World Position = Anchor Position + R(Anchor Yaw) * Local Position
@@ -153,36 +131,18 @@ def main():
     while len(episodes) < args.num_demos:
         attempts += 1
 
-        # Randomize spawn positions in a shared area and ensure no overlap (min distance 0.15m)
-        while True:
-            f_x = random.uniform(*_CUTLERY_SPAWN_X)
-            f_y = random.uniform(*_CUTLERY_SPAWN_Y)
-            k_x = random.uniform(*_CUTLERY_SPAWN_X)
-            k_y = random.uniform(*_CUTLERY_SPAWN_Y)
-            
-            # Check Euclidean distance between fork and knife centers
-            dist = math.sqrt((f_x - k_x)**2 + (f_y - k_y)**2)
-            if dist >= _MIN_SPAWN_DIST:
-                break
-
-        f_yaw = random.uniform(-math.pi, math.pi)
-        f_quat = _euler_xyz_to_quat_wxyz(0, 0, f_yaw)
-
-        k_yaw = random.uniform(-math.pi, math.pi)
-        k_quat = _euler_xyz_to_quat_wxyz(0, 0, k_yaw)
-
-        # 3. Validate kinematic reachability and collisions on CPU
-        success = validator.run_validation_for_episode(
-            [f_x, f_y, _FORK_Z], f_quat,
-            [k_x, k_y, _KNIFE_Z], k_quat
-        )
+        # 3. Randomize and validate kinematic reachability and collisions on CPU
+        success, fork_pos, f_yaw, f_quat, knife_pos, k_yaw, k_quat = validator.run_procedural_test(return_details=True)
 
         if success:
+            f_x, f_y = fork_pos[0], fork_pos[1]
+            k_x, k_y = knife_pos[0], knife_pos[1]
+
             # Reconstruct UMI-style tvec and rvec
             # Local tvec = World Pos - Anchor Pos
             # Use slight vertical offsets (0.018 for fork, 0.011 for knife) to prevent clipping
-            tvec_fork = [f_x - _ANCHOR_X, f_y - _ANCHOR_Y, _FORK_Z]
-            tvec_knife = [k_x - _ANCHOR_X, k_y - _ANCHOR_Y, _KNIFE_Z]
+            tvec_fork = [f_x - _ANCHOR_X, f_y - _ANCHOR_Y, FORK_Z]
+            tvec_knife = [k_x - _ANCHOR_X, k_y - _ANCHOR_Y, KNIFE_Z]
 
             # Local rvec = World Yaw - Anchor Yaw - Per-Object Offset
             # Since rvec is a Rodrigues vector around Z-axis, it's [0.0, 0.0, yaw_diff]

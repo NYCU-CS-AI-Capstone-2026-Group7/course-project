@@ -84,6 +84,35 @@ def yaw_from_quat_wxyz(quat_wxyz):
     return math.atan2(siny_cosp, cosy_cosp)
 
 
+# Publicly exported constants for external scripts (e.g. generate_from_zero.py)
+TABLE_SURFACE_Z = _TABLE_SURFACE_Z
+CUTLERY_SPAWN_X = _CUTLERY_SPAWN_X
+CUTLERY_SPAWN_Y = _CUTLERY_SPAWN_Y
+FORK_Z = _FORK_Z
+KNIFE_Z = _KNIFE_Z
+
+
+def euler_xyz_to_quat_wxyz(roll: float, pitch: float, yaw: float) -> tuple[float, float, float, float]:
+    """Roll, pitch, yaw to quaternion (w, x, y, z)."""
+    cy = math.cos(yaw * 0.5)
+    sy = math.sin(yaw * 0.5)
+    cp = math.cos(pitch * 0.5)
+    sp = math.sin(pitch * 0.5)
+    cr = math.cos(roll * 0.5)
+    sr = math.sin(roll * 0.5)
+
+    w = cr * cp * cy + sr * sp * sy
+    x = sr * cp * cy - cr * sp * sy
+    y = cr * sp * cy + sr * cp * sy
+    z = cr * cp * sy - sr * sp * cy
+    return (w, x, y, z)
+
+
+def normalize_angle(angle: float) -> float:
+    """Normalize angle to [-pi, pi]."""
+    return (angle + math.pi) % (2.0 * math.pi) - math.pi
+
+
 class PyBulletFrankaValidator:
     """Validator using PyBullet physics engine for lightweight CPU simulations."""
 
@@ -603,14 +632,14 @@ class PyBulletFrankaValidator:
         fork_ok = self.validate_trajectory(fork_settled_pos, f_yaw, f_place_pos, "fork", target_yaw=math.pi)
         return fork_ok
 
-    def run_procedural_test(self):
+    def run_procedural_test(self, return_details=False):
         """Randomizes spawns and checks kinematics and collisions."""
         # Randomize spawn positions in a shared area and ensure no overlap (min distance 0.15m)
         while True:
-            f_x = random.uniform(*_CUTLERY_SPAWN_X)
-            f_y = random.uniform(*_CUTLERY_SPAWN_Y)
-            k_x = random.uniform(*_CUTLERY_SPAWN_X)
-            k_y = random.uniform(*_CUTLERY_SPAWN_Y)
+            f_x = random.uniform(*CUTLERY_SPAWN_X)
+            f_y = random.uniform(*CUTLERY_SPAWN_Y)
+            k_x = random.uniform(*CUTLERY_SPAWN_X)
+            k_y = random.uniform(*CUTLERY_SPAWN_Y)
             
             # Check Euclidean distance between fork and knife centers
             dist = math.sqrt((f_x - k_x)**2 + (f_y - k_y)**2)
@@ -618,17 +647,22 @@ class PyBulletFrankaValidator:
                 break
 
         f_yaw = random.uniform(-math.pi, math.pi)
-        f_quat = p.getQuaternionFromEuler([0, 0, f_yaw])
-        f_quat_wxyz = [f_quat[3], f_quat[0], f_quat[1], f_quat[2]] # convert xyzw to wxyz
+        f_quat = euler_xyz_to_quat_wxyz(0, 0, f_yaw)
         
         k_yaw = random.uniform(-math.pi, math.pi)
-        k_quat = p.getQuaternionFromEuler([0, 0, k_yaw])
-        k_quat_wxyz = [k_quat[3], k_quat[0], k_quat[1], k_quat[2]]
+        k_quat = euler_xyz_to_quat_wxyz(0, 0, k_yaw)
         
-        return self.run_validation_for_episode(
-            [f_x, f_y, _FORK_Z], f_quat_wxyz,
-            [k_x, k_y, _KNIFE_Z], k_quat_wxyz
+        fork_pos = [f_x, f_y, FORK_Z]
+        knife_pos = [k_x, k_y, KNIFE_Z]
+        
+        success = self.run_validation_for_episode(
+            fork_pos, f_quat,
+            knife_pos, k_quat
         )
+        
+        if return_details:
+            return success, fork_pos, f_yaw, f_quat, knife_pos, k_yaw, k_quat
+        return success
 
     def close(self):
         p.disconnect()
