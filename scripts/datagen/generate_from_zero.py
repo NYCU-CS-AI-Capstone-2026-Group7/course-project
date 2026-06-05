@@ -77,19 +77,41 @@ def main():
         action="store_true",
         help="Run PyBullet with GUI visualization during generation.",
     )
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=100.0,
+        help="Frame rate (FPS) for GUI visualization during generation.",
+    )
+    parser.add_argument(
+        "--min_dist",
+        type=float,
+        default=0.273,
+        help="Minimum Euclidean distance between fork and knife to prevent overlap (default: 0.273m based on STL AABBs).",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose debug logging of failure reasons in validator.",
+    )
+    parser.add_argument(
+        "--reconnect_interval",
+        type=float,
+        default=10.0,
+        help="PyBullet GUI reconnection interval in seconds to clear rendering cache (default: 10.0s).",
+    )
     args = parser.parse_args()
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Spawn area constants (matching validate_pybullet.py)
-    _TABLE_HEIGHT = 0.0409113
-    _FORK_SPAWN_X = (0.35, 0.48)
-    _FORK_SPAWN_Y = (-0.28, -0.18)
-    _KNIFE_SPAWN_X = (0.35, 0.48)
-    _KNIFE_SPAWN_Y = (-0.62, -0.52)
-    _FORK_Z = _TABLE_HEIGHT + 0.018
-    _KNIFE_Z = _TABLE_HEIGHT + 0.011
+    _TABLE_SURFACE_Z = 0.5
+    _CUTLERY_SPAWN_X = (0.25, 0.55)
+    _CUTLERY_SPAWN_Y = (-0.60, -0.20)
+    _MIN_SPAWN_DIST = args.min_dist
+    _FORK_Z = _TABLE_SURFACE_Z + 0.018
+    _KNIFE_Z = _TABLE_SURFACE_Z + 0.011
 
     # Anchor constants used by simulator loader to reconstruct world poses
     # World Position = Anchor Position + R(Anchor Yaw) * Local Position
@@ -104,7 +126,13 @@ def main():
     _FORK_YAW_OFFSET = 2.0 * math.pi
 
     print("[INFO] Initializing PyBullet Franka Validator...")
-    validator = PyBulletFrankaValidator(use_gui=args.gui)
+    validator = PyBulletFrankaValidator(
+        use_gui=args.gui, 
+        fps=args.fps, 
+        min_dist=args.min_dist, 
+        verbose=args.verbose,
+        reconnect_interval=args.reconnect_interval
+    )
 
     episodes = []
     attempts = 0
@@ -113,15 +141,21 @@ def main():
     while len(episodes) < args.num_demos:
         attempts += 1
 
-        # 1. Randomize fork spawn
-        f_x = random.uniform(*_FORK_SPAWN_X)
-        f_y = random.uniform(*_FORK_SPAWN_Y)
+        # Randomize spawn positions in a shared area and ensure no overlap (min distance 0.15m)
+        while True:
+            f_x = random.uniform(*_CUTLERY_SPAWN_X)
+            f_y = random.uniform(*_CUTLERY_SPAWN_Y)
+            k_x = random.uniform(*_CUTLERY_SPAWN_X)
+            k_y = random.uniform(*_CUTLERY_SPAWN_Y)
+            
+            # Check Euclidean distance between fork and knife centers
+            dist = math.sqrt((f_x - k_x)**2 + (f_y - k_y)**2)
+            if dist >= _MIN_SPAWN_DIST:
+                break
+
         f_yaw = random.uniform(-math.pi, math.pi)
         f_quat = _euler_xyz_to_quat_wxyz(0, 0, f_yaw)
 
-        # 2. Randomize knife spawn
-        k_x = random.uniform(*_KNIFE_SPAWN_X)
-        k_y = random.uniform(*_KNIFE_SPAWN_Y)
         k_yaw = random.uniform(-math.pi, math.pi)
         k_quat = _euler_xyz_to_quat_wxyz(0, 0, k_yaw)
 
@@ -135,8 +169,8 @@ def main():
             # Reconstruct UMI-style tvec and rvec
             # Local tvec = World Pos - Anchor Pos
             # Use slight vertical offsets (0.018 for fork, 0.011 for knife) to prevent clipping
-            tvec_fork = [f_x - _ANCHOR_X, f_y - _ANCHOR_Y, 0.018]
-            tvec_knife = [k_x - _ANCHOR_X, k_y - _ANCHOR_Y, 0.011]
+            tvec_fork = [f_x - _ANCHOR_X, f_y - _ANCHOR_Y, _FORK_Z]
+            tvec_knife = [k_x - _ANCHOR_X, k_y - _ANCHOR_Y, _KNIFE_Z]
 
             # Local rvec = World Yaw - Anchor Yaw - Per-Object Offset
             # Since rvec is a Rodrigues vector around Z-axis, it's [0.0, 0.0, yaw_diff]
@@ -163,8 +197,8 @@ def main():
             episodes.append(episode_entry)
             print(f"  [PASSED] Generated pose {len(episodes)}/{args.num_demos} (attempts: {attempts})")
         else:
-            # Failed poses are silently skipped to keep logs clean
-            pass
+            if args.verbose:
+                print(f"  [FAILED] Attempt {attempts}: Pose validation failed.")
 
     validator.close()
 
