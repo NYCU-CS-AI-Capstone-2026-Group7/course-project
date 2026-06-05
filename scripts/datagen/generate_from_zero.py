@@ -100,6 +100,11 @@ def main():
         default=10.0,
         help="PyBullet GUI reconnection interval in seconds to clear rendering cache (default: 10.0s).",
     )
+    parser.add_argument(
+        "--allow_plate_collision",
+        action="store_true",
+        help="Allow cutlery (fork/knife) to touch or collide with the plate without failing validation."
+    )
     args = parser.parse_args()
 
     output_path = Path(args.output)
@@ -131,7 +136,8 @@ def main():
         fps=args.fps, 
         min_dist=args.min_dist, 
         verbose=args.verbose,
-        reconnect_interval=args.reconnect_interval
+        reconnect_interval=args.reconnect_interval,
+        allow_plate_collision=args.allow_plate_collision
     )
 
     episodes = []

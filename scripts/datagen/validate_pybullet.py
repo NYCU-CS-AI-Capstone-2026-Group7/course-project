@@ -87,13 +87,14 @@ def yaw_from_quat_wxyz(quat_wxyz):
 class PyBulletFrankaValidator:
     """Validator using PyBullet physics engine for lightweight CPU simulations."""
 
-    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0):
+    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0, allow_plate_collision=False):
         self.use_gui = use_gui
         self.verbose = verbose
         self.sleep_time = 1.0 / fps if fps > 0 else 0.0
         self.min_dist = min_dist
         self.reconnect_interval = reconnect_interval
         self.last_reconnect_time = time.time()
+        self.allow_plate_collision = allow_plate_collision
         self.objects = {}
         
         self.initialize_pybullet()
@@ -336,9 +337,11 @@ class PyBulletFrankaValidator:
             # If collision is between table objects (e.g. fork and knife) and they actually touch/penetrate
             if body_a in self.objects.values() and body_b in self.objects.values():
                 if contact[8] <= 0.0:
+                    name_a = next((k for k, v in self.objects.items() if v == body_a), str(body_a))
+                    name_b = next((k for k, v in self.objects.items() if v == body_b), str(body_b))
+                    if self.allow_plate_collision and ("plate" in (name_a, name_b)):
+                        continue
                     if self.verbose:
-                        name_a = next((k for k, v in self.objects.items() if v == body_a), str(body_a))
-                        name_b = next((k for k, v in self.objects.items() if v == body_b), str(body_b))
                         print(f"[DEBUG] Object-object collision: {name_a} and {name_b} at distance {contact[8]:.4f}")
                     return True
 
@@ -601,6 +604,11 @@ def main():
         help="Minimum Euclidean distance between fork and knife (default: 0.273m based on STL AABBs).",
     )
     parser.add_argument(
+        "--allow_plate_collision",
+        action="store_true",
+        help="Allow cutlery (fork/knife) to touch or collide with the plate without failing validation."
+    )
+    parser.add_argument(
         "--reconnect_interval",
         type=float,
         default=10.0,
@@ -613,7 +621,8 @@ def main():
         verbose=args.verbose, 
         fps=args.fps, 
         min_dist=args.min_dist,
-        reconnect_interval=args.reconnect_interval
+        reconnect_interval=args.reconnect_interval,
+        allow_plate_collision=args.allow_plate_collision
     )
     validator.fix_knife_yaw = args.fix_knife_yaw
     validator.fix_fork_yaw = args.fix_fork_yaw
