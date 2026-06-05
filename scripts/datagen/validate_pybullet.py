@@ -122,7 +122,8 @@ class PyBulletFrankaValidator:
             "franka_panda/panda.urdf",
             self.robot_pos,
             self.robot_quat,
-            useFixedBase=True
+            useFixedBase=True,
+            flags=p.URDF_USE_SELF_COLLISION
         )
         self.ee_index = 11  # panda_hand link index
         
@@ -132,6 +133,13 @@ class PyBulletFrankaValidator:
             p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=angle, force=1000)
             
         self.objects = {}
+        
+        # Build parent-child link map for robot to ignore adjacent/sibling collisions
+        self.parent_map = {}
+        for i in range(p.getNumJoints(self.robot_id)):
+            joint_info = p.getJointInfo(self.robot_id, i)
+            parent_link = joint_info[16]
+            self.parent_map[i] = parent_link
         
     def setup_scene(self, fork_pos, fork_quat, knife_pos, knife_quat):
         """Spawns bounding shapes representing the plate, fork, and knife."""
@@ -209,7 +217,40 @@ class PyBulletFrankaValidator:
             
         for _ in range(100):
             p.stepSimulation()
+
+        # Check if any object fell off the table during the settling phase
+        for name, obj_id in self.objects.items():
+            if name in ["fork", "knife"]:
+                pos, _ = p.getBasePositionAndOrientation(obj_id)
+                # If Z height is significantly lower than the table surface, it has fallen
+                if pos[2] < _TABLE_SURFACE_Z - 0.01:
+                    if self.verbose:
+                        print(f"[DEBUG] {name} fell off the table during initialization settling phase! Z: {pos[2]:.4f}")
+                    return False
+        return True
             
+    def get_topology_distance(self, a, b):
+        """Calculates topological distance between two robot links in the kinematic tree."""
+        path_a = []
+        curr = a
+        while curr is not None and curr != -1:
+            path_a.append(curr)
+            curr = self.parent_map.get(curr)
+        path_a.append(-1)
+        
+        path_b = []
+        curr = b
+        while curr is not None and curr != -1:
+            path_b.append(curr)
+            curr = self.parent_map.get(curr)
+        path_b.append(-1)
+        
+        for idx_a, node_a in enumerate(path_a):
+            if node_a in path_b:
+                idx_b = path_b.index(node_a)
+                return idx_a + idx_b
+        return 999
+
     def check_collision(self, ignored_body_id=None):
         """Checks for unintended collisions in the scene."""
         p.performCollisionDetection()
@@ -230,10 +271,27 @@ class PyBulletFrankaValidator:
                    (body_b == self.robot_id and body_a == ignored_body_id):
                     continue
                     
+            # If robot collided with itself (self-collision)
+            if body_a == self.robot_id and body_b == self.robot_id:
+                link_a = contact[3]
+                link_b = contact[4]
+                
+                # Exclude links with topological distance <= 2 to avoid false self-collision reports
+                # (e.g., adjacent parent-child joints, sibling fingers, or adjacent-2 joints due to mesh overlap)
+                topo_dist = self.get_topology_distance(link_a, link_b)
+                if topo_dist <= 2:
+                    continue
+                
+                # Only consider it a collision if they are actually touching or penetrating (distance <= 0)
+                if contact[8] > 0.0:
+                    continue
+                    
+                if self.verbose:
+                    print(f"[DEBUG] Self-collision: link {link_a} and link {link_b} at distance {contact[8]:.4f} (topo_dist={topo_dist})")
+                return True
+
             # If robot collided with table objects (unintended contact)
             if body_a == self.robot_id or body_b == self.robot_id:
-                if body_a == body_b:
-                    continue
                 return True
         return False
 
@@ -409,7 +467,9 @@ class PyBulletFrankaValidator:
         w, x, y, z = knife_quat_wxyz
         k_quat_xyzw = [x, y, z, w]
 
-        self.setup_scene(fork_pos, f_quat_xyzw, knife_pos, k_quat_xyzw)
+        setup_ok = self.setup_scene(fork_pos, f_quat_xyzw, knife_pos, k_quat_xyzw)
+        if not setup_ok:
+            return False
 
         # Get settled positions and orientations after setup phase settling
         fork_settled_pos, fork_settled_quat = p.getBasePositionAndOrientation(self.objects["fork"])
