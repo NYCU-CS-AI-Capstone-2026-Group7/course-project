@@ -40,11 +40,9 @@ _Z_SAFE = _TABLE_SURFACE_Z + 0.20
 _Z_GRASP = _TABLE_SURFACE_Z + 0.09
 _Z_RELEASE = _TABLE_SURFACE_Z + 0.10
 
-_FORK_SPAWN_X = (0.35, 0.48)
-_FORK_SPAWN_Y = (-0.28, -0.18)
-
-_KNIFE_SPAWN_X = (0.35, 0.48)
-_KNIFE_SPAWN_Y = (-0.62, -0.52)
+_CUTLERY_SPAWN_X = (0.25, 0.55)
+_CUTLERY_SPAWN_Y = (-0.60, -0.20)
+_MIN_SPAWN_DIST = 0.15
 
 _PLATE_POS = [0.50, -0.40, _TABLE_SURFACE_Z + 0.05]
 
@@ -89,9 +87,18 @@ def yaw_from_quat_wxyz(quat_wxyz):
 class PyBulletFrankaValidator:
     """Validator using PyBullet physics engine for lightweight CPU simulations."""
 
-    def __init__(self, use_gui=False, verbose=False):
+    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0):
         self.use_gui = use_gui
         self.verbose = verbose
+        self.sleep_time = 1.0 / fps if fps > 0 else 0.0
+        self.min_dist = min_dist
+        self.reconnect_interval = reconnect_interval
+        self.last_reconnect_time = time.time()
+        self.objects = {}
+        
+        self.initialize_pybullet()
+
+    def initialize_pybullet(self):
         if self.use_gui:
             p.connect(p.GUI)
         else:
@@ -132,17 +139,54 @@ class PyBulletFrankaValidator:
             p.resetJointState(self.robot_id, idx, angle)
             p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=angle, force=1000)
             
-        self.objects = {}
-        
         # Build parent-child link map for robot to ignore adjacent/sibling collisions
         self.parent_map = {}
         for i in range(p.getNumJoints(self.robot_id)):
             joint_info = p.getJointInfo(self.robot_id, i)
             parent_link = joint_info[16]
             self.parent_map[i] = parent_link
+
+    def reconnect(self):
+        # Get current camera pose in GUI mode before disconnecting to preserve user view
+        camera_params = None
+        if self.use_gui:
+            try:
+                cam_info = p.getDebugVisualizerCamera()
+                camera_params = {
+                    "yaw": cam_info[8],
+                    "pitch": cam_info[9],
+                    "distance": cam_info[10],
+                    "target_pos": cam_info[11]
+                }
+            except Exception:
+                pass
+
+        p.disconnect()
+        self.objects.clear()
+        self.initialize_pybullet()
+
+        # Restore camera pose in GUI mode
+        if self.use_gui and camera_params is not None:
+            try:
+                p.resetDebugVisualizerCamera(
+                    cameraDistance=camera_params["distance"],
+                    cameraYaw=camera_params["yaw"],
+                    cameraPitch=camera_params["pitch"],
+                    cameraTargetPosition=camera_params["target_pos"]
+                )
+            except Exception:
+                pass
         
     def setup_scene(self, fork_pos, fork_quat, knife_pos, knife_quat):
         """Spawns bounding shapes representing the plate, fork, and knife."""
+        # Check and perform periodic reconnect to clear rendering cache
+        curr_time = time.time()
+        if curr_time - self.last_reconnect_time >= self.reconnect_interval:
+            if self.verbose:
+                print(f"[INFO] Reconnecting PyBullet (interval: {self.reconnect_interval}s) to clear mesh rendering cache...")
+            self.reconnect()
+            self.last_reconnect_time = curr_time
+
         # Clean old objects
         for obj_id in self.objects.values():
             p.removeBody(obj_id)
@@ -228,7 +272,6 @@ class PyBulletFrankaValidator:
                         print(f"[DEBUG] {name} fell off the table during initialization settling phase! Z: {pos[2]:.4f}")
                     return False
         return True
-            
     def get_topology_distance(self, a, b):
         """Calculates topological distance between two robot links in the kinematic tree."""
         path_a = []
@@ -289,6 +332,15 @@ class PyBulletFrankaValidator:
                 if self.verbose:
                     print(f"[DEBUG] Self-collision: link {link_a} and link {link_b} at distance {contact[8]:.4f} (topo_dist={topo_dist})")
                 return True
+
+            # If collision is between table objects (e.g. fork and knife) and they actually touch/penetrate
+            if body_a in self.objects.values() and body_b in self.objects.values():
+                if contact[8] <= 0.0:
+                    if self.verbose:
+                        name_a = next((k for k, v in self.objects.items() if v == body_a), str(body_a))
+                        name_b = next((k for k, v in self.objects.items() if v == body_b), str(body_b))
+                        print(f"[DEBUG] Object-object collision: {name_a} and {name_b} at distance {contact[8]:.4f}")
+                    return True
 
             # If robot collided with table objects (unintended contact)
             if body_a == self.robot_id or body_b == self.robot_id:
@@ -419,7 +471,7 @@ class PyBulletFrankaValidator:
                     return False
                     
                 if self.use_gui:
-                    time.sleep(0.01)
+                    time.sleep(self.sleep_time)
                     
         if grasp_constraint_id is not None:
             p.removeConstraint(grasp_constraint_id)
@@ -433,7 +485,7 @@ class PyBulletFrankaValidator:
         for _ in range(150):
             p.stepSimulation()
             if self.use_gui:
-                time.sleep(0.01)
+                time.sleep(self.sleep_time)
             
             # Check collisions during settling
             if self.check_collision(ignored_body_id=None):
@@ -499,14 +551,22 @@ class PyBulletFrankaValidator:
 
     def run_procedural_test(self):
         """Randomizes spawns and checks kinematics and collisions."""
-        f_x = random.uniform(*_FORK_SPAWN_X)
-        f_y = random.uniform(*_FORK_SPAWN_Y)
+        # Randomize spawn positions in a shared area and ensure no overlap (min distance 0.15m)
+        while True:
+            f_x = random.uniform(*_CUTLERY_SPAWN_X)
+            f_y = random.uniform(*_CUTLERY_SPAWN_Y)
+            k_x = random.uniform(*_CUTLERY_SPAWN_X)
+            k_y = random.uniform(*_CUTLERY_SPAWN_Y)
+            
+            # Check Euclidean distance between fork and knife centers
+            dist = math.sqrt((f_x - k_x)**2 + (f_y - k_y)**2)
+            if dist >= self.min_dist:
+                break
+
         f_yaw = random.uniform(-math.pi, math.pi)
         f_quat = p.getQuaternionFromEuler([0, 0, f_yaw])
         f_quat_wxyz = [f_quat[3], f_quat[0], f_quat[1], f_quat[2]] # convert xyzw to wxyz
         
-        k_x = random.uniform(*_KNIFE_SPAWN_X)
-        k_y = random.uniform(*_KNIFE_SPAWN_Y)
         k_yaw = random.uniform(-math.pi, math.pi)
         k_quat = p.getQuaternionFromEuler([0, 0, k_yaw])
         k_quat_wxyz = [k_quat[3], k_quat[0], k_quat[1], k_quat[2]]
@@ -533,9 +593,28 @@ def main():
     )
     parser.add_argument("--fix_knife_yaw", action="store_true", help="Force the knife's grasp yaw to be zero.")
     parser.add_argument("--fix_fork_yaw", action="store_true", help="Force the fork's grasp yaw to be zero.")
+    parser.add_argument("--fps", type=float, default=100.0, help="Playback FPS for GUI visualization (default: 100.0).")
+    parser.add_argument(
+        "--min_dist",
+        type=float,
+        default=0.273,
+        help="Minimum Euclidean distance between fork and knife (default: 0.273m based on STL AABBs).",
+    )
+    parser.add_argument(
+        "--reconnect_interval",
+        type=float,
+        default=10.0,
+        help="PyBullet GUI reconnection interval in seconds to clear rendering cache (default: 10.0s).",
+    )
     args = parser.parse_args()
     
-    validator = PyBulletFrankaValidator(use_gui=args.gui, verbose=args.verbose)
+    validator = PyBulletFrankaValidator(
+        use_gui=args.gui, 
+        verbose=args.verbose, 
+        fps=args.fps, 
+        min_dist=args.min_dist,
+        reconnect_interval=args.reconnect_interval
+    )
     validator.fix_knife_yaw = args.fix_knife_yaw
     validator.fix_fork_yaw = args.fix_fork_yaw
 
