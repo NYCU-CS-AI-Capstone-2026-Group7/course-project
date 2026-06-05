@@ -31,11 +31,14 @@ except ImportError:
 # Constants & Configuration
 # ---------------------------------------------------------------------------
 # Table Dimensions
+_TABLE_SURFACE_Z = 0.5
 _TABLE_HEIGHT = 0.0409113
+_TABLE_LENGTH = 0.70
+_TABLE_WIDTH = 0.65
 
-_Z_SAFE = _TABLE_HEIGHT + 0.20
-_Z_GRASP = _TABLE_HEIGHT + 0.09
-_Z_RELEASE = _TABLE_HEIGHT + 0.10
+_Z_SAFE = _TABLE_SURFACE_Z + 0.20
+_Z_GRASP = _TABLE_SURFACE_Z + 0.09
+_Z_RELEASE = _TABLE_SURFACE_Z + 0.10
 
 _FORK_SPAWN_X = (0.35, 0.48)
 _FORK_SPAWN_Y = (-0.28, -0.18)
@@ -43,10 +46,10 @@ _FORK_SPAWN_Y = (-0.28, -0.18)
 _KNIFE_SPAWN_X = (0.35, 0.48)
 _KNIFE_SPAWN_Y = (-0.62, -0.52)
 
-_PLATE_POS = [0.50, -0.40, _TABLE_HEIGHT + 0.05]
+_PLATE_POS = [0.50, -0.40, _TABLE_SURFACE_Z + 0.05]
 
-_FORK_Z = _TABLE_HEIGHT + 0.018
-_KNIFE_Z = _TABLE_HEIGHT + 0.011
+_FORK_Z = _TABLE_SURFACE_Z + 0.018
+_KNIFE_Z = _TABLE_SURFACE_Z + 0.011
 
 _FRANKA_REST_POSE = [0.0, -math.pi/4, 0.0, -3.0*math.pi/4, 0.0, math.pi/2, math.pi/4]
 
@@ -100,19 +103,19 @@ class PyBulletFrankaValidator:
         # Load Table and Robot
         self.plane_id = p.loadURDF("plane.urdf")
         
-        # Spawn Widened Table to prevent objects falling off bounds in PyBullet
-        table_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.7/2, 1.2/2, _TABLE_HEIGHT/2])
-        table_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.7/2, 1.2/2, _TABLE_HEIGHT/2], rgbaColor=[0.6, 0.4, 0.2, 1])
+        # Spawn Table to match the actual square table dimensions in Isaac Sim
+        table_col = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_TABLE_LENGTH/2, _TABLE_WIDTH/2, _TABLE_HEIGHT/2])
+        table_visual = p.createVisualShape(p.GEOM_BOX, halfExtents=[_TABLE_LENGTH/2, _TABLE_WIDTH/2, _TABLE_HEIGHT/2], rgbaColor=[0.6, 0.4, 0.2, 1])
         self.table_id = p.createMultiBody(
             baseMass=0.0,
             baseCollisionShapeIndex=table_col,
             baseVisualShapeIndex=table_visual,
-            basePosition=[0.353162, -0.25, _TABLE_HEIGHT / 2],
+            basePosition=[0.353162, -0.351832, _TABLE_SURFACE_Z - _TABLE_HEIGHT / 2],
             baseOrientation=[0, 0, 0, 1]
         )
         
-        # Spawn robot base at (0.35, -0.74, 0.0) on the ground
-        self.robot_pos = [0.35, -0.74, 0.0]
+        # Spawn robot base at (0.35, -0.74, _TABLE_SURFACE_Z - _TABLE_HEIGHT)
+        self.robot_pos = [0.35, -0.74, _TABLE_SURFACE_Z - _TABLE_HEIGHT]
         self.robot_quat = p.getQuaternionFromEuler([0, 0, math.pi/2])
         
         self.robot_id = p.loadURDF(
@@ -391,9 +394,9 @@ class PyBulletFrankaValidator:
             
         # Height check: ensure it hasn't fallen off the table
         pos, _ = p.getBasePositionAndOrientation(obj_body_id)
-        if pos[2] < _TABLE_HEIGHT - 0.01:
+        if pos[2] < _TABLE_SURFACE_Z - 0.01:
             if self.verbose:
-                print(f"[DEBUG] Height check failed: pos[2]={pos[2]:.4f} (table height limit={_TABLE_HEIGHT - 0.01:.4f})")
+                print(f"[DEBUG] Height check failed: pos[2]={pos[2]:.4f} (table height limit={_TABLE_SURFACE_Z - 0.01:.4f})")
             return False
             
         return True
@@ -492,7 +495,7 @@ def main():
         tag_to_object = {2: "knife", 3: "fork"}
         anchor_tag_id = 0
         anchor_world_pose = (0.40, 0.10, 0.0)
-        object_z = 0.05
+        object_z = _TABLE_SURFACE_Z + 0.05
         object_roll = 0.0
         object_pitch = 0.0
         per_object_yaw_offset = {
