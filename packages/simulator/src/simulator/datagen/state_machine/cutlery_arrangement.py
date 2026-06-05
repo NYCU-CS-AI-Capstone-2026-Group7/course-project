@@ -80,7 +80,7 @@ _FRANKA_REST_JOINT_POS = {
 _PICK_ORDER = (_KNIFE_NAME, _FORK_NAME)
 _PLACE_X_SIGNS = (+1.0, -1.0)  # fork → +x of plate, knife → -x of plate
 
-_PHASE_DURATIONS_PER_OBJECT = (180, 130, 20, 160, 170, 15, 30)
+_PHASE_DURATIONS_PER_OBJECT = (180, 130, 20, 160, 170, 40, 30)
 _PHASES_PER_OBJECT = len(_PHASE_DURATIONS_PER_OBJECT)
 
 
@@ -335,7 +335,11 @@ class CutleryArrangementStateMachine(StateMachineBase):
     def _phase_lower_to_release(self, place_pos_w, num_envs, device):
         target = place_pos_w.clone()
         target[:, 2] += _RELEASE_Z_OFFSET
-        return target, _constant_gripper(num_envs, device, _GRIPPER_CLOSE)
+        # Lower first (15 steps), then open gripper (25 steps) to release before retreating
+        if self._step_count < 15:
+            return target, _constant_gripper(num_envs, device, _GRIPPER_CLOSE)
+        else:
+            return target, _constant_gripper(num_envs, device, _GRIPPER_OPEN)
 
     def _phase_retreat(self, place_pos_w, num_envs, device):
         target = place_pos_w.clone()
@@ -474,9 +478,18 @@ class CutleryArrangementStateMachine(StateMachineBase):
                 base_yaw + yaw_offset + self._gripper_down_yaw_offset_w
             ).clone()
 
-        if phase_in_cycle >= 4:
-            # Place phases: rotate gripper to align with the final placement orientation
-            # Fork target yaw is pi, Knife target yaw is 0.0
+        if phase_in_cycle == 4:
+            # Gradually interpolate yaw from grasp yaw to place yaw during phase 4
+            target_obj_yaw = math.pi if obj_name == _FORK_NAME else 0.0
+            place_yaw = target_obj_yaw + yaw_offset + self._gripper_down_yaw_offset_w
+            grasp_yaw = self._gripper_down_yaw_w.to(device=device, dtype=dtype)
+            
+            denom = max(self._events_dt[self._event] - 1, 1)
+            alpha = min(self._step_count / denom, 1.0)
+            
+            diff = (place_yaw - grasp_yaw + math.pi) % (2.0 * math.pi) - math.pi
+            yaw = grasp_yaw + alpha * diff
+        elif phase_in_cycle > 4:
             target_obj_yaw = math.pi if obj_name == _FORK_NAME else 0.0
             yaw = torch.full((num_envs,), target_obj_yaw + yaw_offset, device=device, dtype=dtype)
             yaw += self._gripper_down_yaw_offset_w
