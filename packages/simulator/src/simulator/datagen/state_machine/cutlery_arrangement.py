@@ -80,7 +80,8 @@ _FRANKA_REST_JOINT_POS = {
 _PICK_ORDER = (_KNIFE_NAME, _FORK_NAME)
 _PLACE_X_SIGNS = (+1.0, -1.0)  # fork → +x of plate, knife → -x of plate
 
-_PHASE_DURATIONS_PER_OBJECT = (180, 130, 20, 160, 170, 40, 30)
+_TIME_SCALE_FACTOR = 1.5
+_PHASE_DURATIONS_PER_OBJECT = tuple(int(d * _TIME_SCALE_FACTOR) for d in (180, 130, 20, 160, 170, 40, 30))
 _PHASES_PER_OBJECT = len(_PHASE_DURATIONS_PER_OBJECT)
 
 
@@ -156,7 +157,17 @@ class CutleryArrangementStateMachine(StateMachineBase):
     The action vector is ``[panda_joint1, ..., panda_joint7, gripper]``.
     """
 
-    MAX_STEPS: int = len(_PICK_ORDER) * sum(_PHASE_DURATIONS_PER_OBJECT) + 100
+    _ph_durations = tuple(int(d * _TIME_SCALE_FACTOR) for d in (180, 130, 20, 160, 170, 40, 30))
+    _ph_timeouts = (
+        int(2.25 * _ph_durations[0]),  # Phase 0
+        int(2.25 * _ph_durations[1]),  # Phase 1
+        _ph_durations[2],              # Phase 2
+        int(2.25 * _ph_durations[3]),  # Phase 3
+        int(2.25 * _ph_durations[4]),  # Phase 4
+        int(35 * _TIME_SCALE_FACTOR * _TIME_SCALE_FACTOR) + int(25 * _TIME_SCALE_FACTOR),  # Phase 5 (Lowering timeout double-scaled + Release duration scaled)
+        int(2.25 * _ph_durations[6])   # Phase 6
+    )
+    MAX_STEPS: int = len(_PICK_ORDER) * sum(_ph_timeouts) + 100
     EPSILON_POS: float = 0.015
     EPSILON_ROT: float = 0.25
 
@@ -347,7 +358,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         
         # Backward-compatible check: if we advanced without env, use time-based step count,
         # otherwise use closed-loop _phase5_lowered flag
-        is_lowered = (self._step_count >= 15) if not getattr(self, "_last_advance_with_env", False) else self._phase5_lowered
+        is_lowered = (self._step_count >= int(15 * _TIME_SCALE_FACTOR)) if not getattr(self, "_last_advance_with_env", False) else self._phase5_lowered
         
         if not is_lowered:
             return target, _constant_gripper(num_envs, device, _GRIPPER_CLOSE)
@@ -419,17 +430,20 @@ class CutleryArrangementStateMachine(StateMachineBase):
                 if not self._phase5_lowered:
                     # Subphase 5.1: Lowering
                     arrived = self.check_arrival(env).all()
-                    # Enforce a minimum of 5 steps to allow motion, and maximum 35 steps timeout
-                    if arrived and self._step_count >= 5:
+                    # Enforce a minimum of steps to allow motion, and maximum steps timeout
+                    min_steps = max(5, int(5 * _TIME_SCALE_FACTOR))
+                    max_steps = int(35 * _TIME_SCALE_FACTOR * _TIME_SCALE_FACTOR)
+                    if arrived and self._step_count >= min_steps:
                         self._phase5_lowered = True
                         self._step_count = 0
-                    elif self._step_count >= 35:
-                        print(f"[StateMachine] [TIMEOUT] Event {self._event} (Phase 5 Lowering) of object '{obj_name}' timed out at step {self._step_count} (max steps: 35)")
+                    elif self._step_count >= max_steps:
+                        print(f"[StateMachine] [TIMEOUT] Event {self._event} (Phase 5 Lowering) of object '{obj_name}' timed out at step {self._step_count} (max steps: {max_steps})")
                         self._phase5_lowered = True
                         self._step_count = 0
                 else:
-                    # Subphase 5.2: Opening gripper to release (purely time-based 25 steps)
-                    if self._step_count < 25:
+                    # Subphase 5.2: Opening gripper to release (purely time-based release duration)
+                    release_duration = int(25 * _TIME_SCALE_FACTOR)
+                    if self._step_count < release_duration:
                         return
                     self._event += 1
                     self._step_count = 0
@@ -438,7 +452,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
                 # Movement phases: 0, 1, 3, 4, 6
                 arrived = self.check_arrival(env).all()
                 min_steps = max(10, int(0.10 * default_duration))
-                max_steps = int(1.5 * default_duration)
+                max_steps = int(2.25 * default_duration)
                 
                 # Check if arrived after minimum steps or if we timed out
                 if arrived and self._step_count >= min_steps:
