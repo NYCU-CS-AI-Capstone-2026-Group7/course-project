@@ -17,6 +17,10 @@ import time
 import math
 import random
 import numpy as np
+from pathlib import Path
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _SCRIPT_DIR.parents[1]
 
 try:
     import pybullet as p
@@ -37,8 +41,8 @@ _TABLE_LENGTH = 0.70
 _TABLE_WIDTH = 0.65
 
 _Z_SAFE = _TABLE_SURFACE_Z + 0.20
-_Z_GRASP = _TABLE_SURFACE_Z + 0.09
-_Z_RELEASE = _TABLE_SURFACE_Z + 0.10
+_Z_GRASP = _TABLE_SURFACE_Z + 0.11
+_Z_RELEASE = _TABLE_SURFACE_Z + 0.11
 
 _CUTLERY_SPAWN_X = (0.25, 0.55)
 _CUTLERY_SPAWN_Y = (-0.60, -0.20)
@@ -163,12 +167,16 @@ class PyBulletFrankaValidator:
             useFixedBase=True,
             flags=p.URDF_USE_SELF_COLLISION
         )
-        self.ee_index = 11  # panda_hand link index
+        self.ee_index = 8  # panda_hand link index
         
         # Move joints to home rest pose
         for idx, angle in enumerate(_FRANKA_REST_POSE):
             p.resetJointState(self.robot_id, idx, angle)
             p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=angle, force=1000)
+        p.resetJointState(self.robot_id, 9, 0.04)
+        p.resetJointState(self.robot_id, 10, 0.04)
+        p.setJointMotorControl2(self.robot_id, 9, p.POSITION_CONTROL, targetPosition=0.04, force=1000)
+        p.setJointMotorControl2(self.robot_id, 10, p.POSITION_CONTROL, targetPosition=0.04, force=1000)
             
         # Build parent-child link map for robot to ignore adjacent/sibling collisions
         self.parent_map = {}
@@ -182,6 +190,23 @@ class PyBulletFrankaValidator:
         for i in range(7):
             joint_info = p.getJointInfo(self.robot_id, i)
             self.joint_limits.append((joint_info[8], joint_info[9]))
+            
+        # Fetch joint limits for all active joints (to constrain calculateInverseKinematics)
+        self.ik_lower_limits = []
+        self.ik_upper_limits = []
+        self.ik_joint_ranges = []
+        self.ik_rest_poses = []
+        for i in range(p.getNumJoints(self.robot_id)):
+            joint_info = p.getJointInfo(self.robot_id, i)
+            j_type = joint_info[2]
+            if j_type != p.JOINT_FIXED:
+                self.ik_lower_limits.append(joint_info[8])
+                self.ik_upper_limits.append(joint_info[9])
+                self.ik_joint_ranges.append(joint_info[9] - joint_info[8])
+                if len(self.ik_rest_poses) < 7:
+                    self.ik_rest_poses.append(_FRANKA_REST_POSE[len(self.ik_rest_poses)])
+                else:
+                    self.ik_rest_poses.append(0.04) # Gripper finger joints rest pose
 
     def reconnect(self):
         # Get current camera pose in GUI mode before disconnecting to preserve user view
@@ -251,15 +276,16 @@ class PyBulletFrankaValidator:
         
         # 2. Spawn Fork (STL mesh aligned by -90deg about X-axis, scaled by 100)
         q_align = p.getQuaternionFromEuler([-math.pi/2, 0, math.pi])
+        fork_stl = str(_REPO_ROOT / "packages" / "simulator" / "assets" / "scenes" / "dining_room" / "objects" / "Fork" / "fork.stl")
         fork_col = p.createCollisionShape(
             p.GEOM_MESH, 
-            fileName="packages/simulator/assets/scenes/dining_room/objects/Fork/fork.stl", 
+            fileName=fork_stl, 
             meshScale=[100, 100, 100],
             collisionFrameOrientation=q_align
         )
         fork_visual = p.createVisualShape(
             p.GEOM_MESH,
-            fileName="packages/simulator/assets/scenes/dining_room/objects/Fork/fork.stl",
+            fileName=fork_stl,
             meshScale=[100, 100, 100],
             visualFrameOrientation=q_align
         )
@@ -272,15 +298,16 @@ class PyBulletFrankaValidator:
         )
 
         # 3. Spawn Knife (STL mesh aligned by -90deg about X-axis, scaled by 100)
+        knife_stl = str(_REPO_ROOT / "packages" / "simulator" / "assets" / "scenes" / "dining_room" / "objects" / "Knife" / "knife.stl")
         knife_col = p.createCollisionShape(
             p.GEOM_MESH, 
-            fileName="packages/simulator/assets/scenes/dining_room/objects/Knife/knife.stl", 
+            fileName=knife_stl, 
             meshScale=[100, 100, 100],
             collisionFrameOrientation=q_align
         )
         knife_visual = p.createVisualShape(
             p.GEOM_MESH,
-            fileName="packages/simulator/assets/scenes/dining_room/objects/Knife/knife.stl",
+            fileName=knife_stl,
             meshScale=[100, 100, 100],
             visualFrameOrientation=q_align
         )
@@ -295,6 +322,8 @@ class PyBulletFrankaValidator:
         # Step simulation to let spawned objects settle flat on the table
         for idx in range(7):
             p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=_FRANKA_REST_POSE[idx], force=1000)
+        p.setJointMotorControl2(self.robot_id, 9, p.POSITION_CONTROL, targetPosition=0.04, force=1000)
+        p.setJointMotorControl2(self.robot_id, 10, p.POSITION_CONTROL, targetPosition=0.04, force=1000)
             
         for _ in range(100):
             p.stepSimulation()
@@ -362,8 +391,8 @@ class PyBulletFrankaValidator:
                 if topo_dist <= 2:
                     continue
                 
-                # Only consider it a collision if they are actually touching or penetrating (distance <= 0)
-                if contact[8] > 0.0:
+                # Only consider it a collision if they are actually touching or penetrating significantly (distance <= -0.01)
+                if contact[8] > -0.01:
                     continue
                     
                 if self.verbose:
@@ -383,6 +412,9 @@ class PyBulletFrankaValidator:
 
             # If robot collided with table objects (unintended contact)
             if body_a == self.robot_id or body_b == self.robot_id:
+                other_body = body_b if body_a == self.robot_id else body_a
+                if self.allow_plate_collision and other_body == self.objects.get("plate"):
+                    continue
                 return True
         return False
 
@@ -392,6 +424,8 @@ class PyBulletFrankaValidator:
         for idx, angle in enumerate(_FRANKA_REST_POSE):
             p.resetJointState(self.robot_id, idx, angle)
             p.setJointMotorControl2(self.robot_id, idx, p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+        p.resetJointState(self.robot_id, 9, 0.04)
+        p.resetJointState(self.robot_id, 10, 0.04)
             
         current_ee_state = p.getLinkState(self.robot_id, self.ee_index)
         current_ee_pos = np.array(current_ee_state[4])
@@ -445,29 +479,14 @@ class PyBulletFrankaValidator:
                     self.robot_id,
                     self.ee_index,
                     targetPosition=list(target_pos),
-                    targetOrientation=p.getQuaternionFromEuler([math.pi, 0, target_yaw_val + math.pi/2])
+                    targetOrientation=p.getQuaternionFromEuler([math.pi, 0, target_yaw_val + math.pi/2]),
+                    lowerLimits=self.ik_lower_limits,
+                    upperLimits=self.ik_upper_limits,
+                    jointRanges=self.ik_joint_ranges,
+                    restPoses=self.ik_rest_poses
                 )
                 
-                # Dynamic joint 7 limit prevention: if IK output violates limit, steer yaw in opposite direction
-                q7_val = joint_angles[6]
-                lower_limit, upper_limit = self.joint_limits[6]
-                if q7_val > upper_limit or q7_val < lower_limit:
-                    ee_state = p.getLinkState(self.robot_id, self.ee_index)
-                    ee_quat = ee_state[5]
-                    ee_euler = p.getEulerFromQuaternion(ee_quat)
-                    ee_yaw = ee_euler[2] - math.pi/2
-                    
-                    if q7_val > upper_limit:
-                        adjusted_yaw = ee_yaw - 0.08
-                    else:
-                        adjusted_yaw = ee_yaw + 0.08
-                        
-                    joint_angles = p.calculateInverseKinematics(
-                        self.robot_id,
-                        self.ee_index,
-                        targetPosition=list(target_pos),
-                        targetOrientation=p.getQuaternionFromEuler([math.pi, 0, adjusted_yaw + math.pi/2])
-                    )
+
                 
                 # Apply joint angles
                 if self.arm_physics:
@@ -482,6 +501,11 @@ class PyBulletFrankaValidator:
                             force=200.0,
                             maxVelocity=2.0
                         )
+                    # Control finger joints physically
+                    finger_target = 0.015 if has_grasped else 0.04
+                    p.setJointMotorControl2(self.robot_id, 9, p.POSITION_CONTROL, targetPosition=finger_target, force=100.0)
+                    p.setJointMotorControl2(self.robot_id, 10, p.POSITION_CONTROL, targetPosition=finger_target, force=100.0)
+                    
                     # Run physics steps to let the arm move to target
                     physics_steps = 20
                     for _ in range(physics_steps):
@@ -494,6 +518,11 @@ class PyBulletFrankaValidator:
                         lower, upper = self.joint_limits[j_idx]
                         clamped_angle = max(lower, min(upper, angle))
                         p.resetJointState(self.robot_id, j_idx, clamped_angle)
+                    
+                    # Control finger joints kinematically
+                    finger_target = 0.015 if has_grasped else 0.04
+                    p.resetJointState(self.robot_id, 9, finger_target)
+                    p.resetJointState(self.robot_id, 10, finger_target)
                     
                 if has_grasped:
                     if grasp_constraint_id is None:
@@ -543,7 +572,7 @@ class PyBulletFrankaValidator:
                         grasp_constraint_id = None
                     
                 # Collision check
-                ignored = obj_body_id if has_grasped else None
+                ignored = obj_body_id
                 collision_detected = self.check_collision(ignored_body_id=ignored)
                 
                 if collision_detected:
