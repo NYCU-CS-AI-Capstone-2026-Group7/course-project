@@ -178,7 +178,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         int(2.25 * _ph_durations[6])   # Phase 6
     )
     MAX_STEPS: int = len(_PICK_ORDER) * sum(_ph_timeouts) + 100
-    EPSILON_POS: float = 0.015
+    EPSILON_POS: float = 0.03
     EPSILON_ROT: float = 0.25
 
     def __init__(self) -> None:
@@ -200,6 +200,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._last_target_quat_w: torch.Tensor | None = None
         self._phase5_lowered: bool = False
         self._last_advance_with_env: bool = False
+        self._initial_obj_pos_w: torch.Tensor | None = None
+        self._initial_obj_quat_w: torch.Tensor | None = None
 
     # ------------------------------------------------------------------
     # StateMachineBase interface
@@ -270,6 +272,13 @@ class CutleryArrangementStateMachine(StateMachineBase):
         plate_pos_w = env.scene[_PLATE_NAME].data.root_pos_w.clone()
         robot_root_pos_w = robot.data.root_pos_w.clone()
 
+        if self._initial_obj_pos_w is None or self._initial_obj_pos_w.shape[0] != num_envs:
+            self._initial_obj_pos_w = obj_pos_w.clone()
+            self._initial_obj_quat_w = obj_quat_w.clone()
+
+        obj_pos_w_ref = self._initial_obj_pos_w
+        obj_quat_w_ref = self._initial_obj_quat_w
+
         place_target_w = plate_pos_w.clone()
         place_target_w[:, 0] += x_sign * _PLACE_OFFSET
 
@@ -279,11 +288,11 @@ class CutleryArrangementStateMachine(StateMachineBase):
         phase_in_cycle = self._event % _PHASES_PER_OBJECT
 
         target_quat_w = self._gripper_down_quat_w(
-            obj_quat_w,
+            obj_quat_w_ref,
             obj_name,
             num_envs,
             device,
-            obj_quat_w.dtype,
+            obj_quat_w_ref.dtype,
             yaw_offset=_GRASP_YAW_OFFSET,
             phase_in_cycle=phase_in_cycle,
         )
@@ -291,29 +300,29 @@ class CutleryArrangementStateMachine(StateMachineBase):
         # Calculate local frame offset away from the tip (towards the handle)
         # Fork: tip points to +z, handle points to -z
         # Knife: tip points to -z, handle points to +z
-        device = obj_pos_w.device
-        num_envs = obj_pos_w.shape[0]
+        device = obj_pos_w_ref.device
+        num_envs = obj_pos_w_ref.shape[0]
         distance = _GRASP_RETREAT_PER_OBJECT.get(obj_name, 0.0)
         
-        local_offset = torch.zeros((num_envs, 3), device=device, dtype=obj_pos_w.dtype)
+        local_offset = torch.zeros((num_envs, 3), device=device, dtype=obj_pos_w_ref.dtype)
         if obj_name == _FORK_NAME:
             local_offset[:, 2] = -distance
         elif obj_name == _KNIFE_NAME:
             local_offset[:, 2] = distance
             
-        world_offset = quat_apply(obj_quat_w, local_offset)
+        world_offset = quat_apply(obj_quat_w_ref, local_offset)
         
-        grasp_anchor_w = obj_pos_w.clone()
+        grasp_anchor_w = obj_pos_w_ref.clone()
         grasp_anchor_w[:, :2] += world_offset[:, :2]
 
         if phase_in_cycle == 0:
-            target_pos_w, gripper_cmd = self._phase_move_above_object(obj_pos_w, num_envs, device)
+            target_pos_w, gripper_cmd = self._phase_move_above_object(obj_pos_w_ref, num_envs, device)
         elif phase_in_cycle == 1:
             target_pos_w, gripper_cmd = self._phase_approach_object(grasp_anchor_w, num_envs, device)
         elif phase_in_cycle == 2:
             target_pos_w, gripper_cmd = self._phase_grasp(grasp_anchor_w, num_envs, device)
         elif phase_in_cycle == 3:
-            target_pos_w, gripper_cmd = self._phase_lift(obj_pos_w, num_envs, device)
+            target_pos_w, gripper_cmd = self._phase_lift(obj_pos_w_ref, num_envs, device)
         elif phase_in_cycle == 4:
             target_pos_w, gripper_cmd = self._phase_move_above_place(place_target_w, num_envs, device)
         elif phase_in_cycle == 5:
@@ -519,6 +528,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
             self._gripper_down_yaw_w = None
             self._gripper_down_yaw_offset_w = None
             self._phase5_lowered = False
+            self._initial_obj_pos_w = None
+            self._initial_obj_quat_w = None
 
     def reset(self) -> None:
         self._step_count = 0
@@ -532,6 +543,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._last_target_quat_w = None
         self._phase5_lowered = False
         self._last_advance_with_env = False
+        self._initial_obj_pos_w = None
+        self._initial_obj_quat_w = None
 
     # ------------------------------------------------------------------
     # IK / control helpers (same as CupStackingStateMachine)
