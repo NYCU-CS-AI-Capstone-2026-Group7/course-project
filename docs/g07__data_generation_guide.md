@@ -127,4 +127,76 @@ python scripts/datagen/merge_poses.py \
 python -c "import json; open('data/merged_object_poses.json', 'w').write(json.dumps(json.load(open('data/procedural_spawn/demos/mapping/object_poses.json')) + json.load(open('data/AI-final-49/demos/mapping/object_poses.json')), indent=4))"
 ```
 
+---
+
+## 五、 餐具擺放狀態機 8 階段對照表
+
+在重構與時間常數對齊後，機械手臂在整理每件餐具（先刀後叉）時會依序執行以下 8 個 Phase：
+
+| Phase 編號 | 階段名稱 (Name) | 執行步數 (Durations) | 超時上限 (Timeouts) | 控制模式 (Control Mode) | 夾爪狀態 (Gripper) | 旋轉對齊 (Rotation) | 動作細節描述 (Detailed Description) |
+| :---: | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **0** | **Move above object (Hover)**<br>移動至物體上方懸停 | `270` | `405` | 閉環對齊 | 張開 | 無 | 手臂從起始位置移至物件初始中心上方 `15 cm` 的位置，夾爪向下並初步轉動對齊物件偏航角。 |
+| **1** | **Approach down to object**<br>下降接近物件 | `130` | `195` | 閉環對齊 | 張開 | 無 | 夾爪垂直降到物件上方 `8 cm` (`_GRASP_Z_OFFSET`)，將指爪套入物件夾取點。 |
+| **2** | **Close gripper to grasp**<br>閉合夾爪進行抓取 | `20` | `20` | 開環計時 | 閉合中 | 無 | 手臂保持不動，夾爪向內閉合，為純時間控制（等待 20 步以確實夾緊）。 |
+| **3** | **Lift object upward**<br>抬升物件 | `160` | `240` | 閉環對齊 | 閉合 | 無 | 手臂垂直抬升物件至 `22 cm` 的高度 (`_LIFT_Z_OFFSET` 已被修正為 22 cm)，脫離桌面摩擦。 |
+| **4** | **Move above target position**<br>移動至放置點上方 | `255` | `382` | 閉環對齊 | 閉合 | **有（Yaw 插值）** | 手臂橫移至盤子旁的放置點上方（維持 `22 cm` 高度），**同時在移動中漸進式地將手腕 Yaw 角旋轉對齊最終擺放方向**。 |
+| **5** | **Lower to release**<br>下降至擺放高度 | `15` | `22` | 閉環對齊 | 閉合 | 無 | 手臂垂直下降至離桌面 `9 cm` 高度 (`_RELEASE_Z_OFFSET`)，準備釋放物件（位置對齊後即進入下一階段）。 |
+| **6** | **Open gripper to release**<br>原地開爪釋放物件 | `25` | `25` | 開環計時 | 張開中 | 無 | 手臂在放手高度保持完全靜止，夾爪向外張開釋放物件（等待 25 步讓物件平穩落地，避免拉扯）。 |
+| **7** | **Retreat upward**<br>升起撤退 | `30` | `45` | 閉環對齊 | 張開 | 無 | 空夾爪垂直升起至 `22 cm` 高度，避免橫向橫掃時撞倒已放置好的刀叉，隨後切換至下一個物件。 |
+
+* **控制模式說明**：
+  * **閉環對齊**：手臂會利用 `check_arrival` 實時監測機械手臂是否已到達目標位置與角度（位置誤差 $\le 3.0$ cm，角度誤差 $\le 5.73^\circ$），一旦到達就會提早跳轉下一階段；若未在「超時上限」前到達則會記錄 timeout 診斷訊息並強制進入下一階段。
+  * **開環計時**：夾爪的物理開合是時間驅動的，因此程式碼會固定跑滿「執行步數」以確保物理效果完成。
+
+---
+
+## 六、 generate.py 與 validate_pybullet.py 早期終止 (Early Stage Termination) 機制對照表
+
+在數據生成主程式與 PyBullet 預篩選腳本中，針對失敗或異常的 Episode 有不同的早期終止與過濾機制：
+
+| 終止與過濾條件 | `generate.py` (Isaac Sim 模擬/錄製主程式) | `validate_pybullet.py` (PyBullet CPU 預檢腳本) |
+| :--- | :--- | :--- |
+| **夾取失敗判定**<br>*(Grasp Failure)* | **有早期中斷**<br>在 Lift 階段結束時（即 Event 3 或 11），會檢查刀叉的 Z 軸高度是否低於 `0.08 m`。若未成功提起，視為夾取失敗，**立即中斷並跳過此 Episode**。 | **無中斷 (物理上強制夾住)**<br>使用 PyBullet 的 `p.createConstraint(..., p.JOINT_FIXED)` 強行將刀叉固定在夾爪上進行運動學仿真，故無滑落問題。 |
+| **物體掉落判定**<br>*(Object Fall)* | **全程持續偵測**<br>在整個模擬期間，隨時監測桌上所有任務物件的 Z 軸高度。一旦任何物件低於桌子（跌落），**立即中斷並跳至下一個 Pose**。 | **僅初始化階段偵測**<br>僅在初始放置 settling 階段 (前 100 步) 檢查刀叉 Z 軸是否低於 `_TABLE_SURFACE_Z - 0.01`。一旦掉落就回傳 `False` 中斷，後續運動過程則不重複偵測。 |
+| **碰撞偵測判定**<br>*(Collision)* | **不會因為碰撞中斷**<br>允許手臂在運作中與桌子、盤子或刀叉產生摩擦碰撞（只要不把東西撞落桌子），模擬會持續進行，最後才透過位置檢查成功與否。 | **瞬間中斷**<br>在路徑插補的每一步，都會呼叫 `performCollisionDetection()`。一旦偵測到**非預期碰撞**（如自我碰撞、物件碰撞、手臂撞桌子），**立即回傳 `False` 判定此 Pose 失敗**。 |
+| **超時限制判定**<br>*(Timeout)* | **狀態機與 Episode 總步數限制**<br>當各 Phase 到達我們設定的閉環最大步數超時限制（例如 Movement 1.5 倍，下降 22 步）時會跳過並印出診斷 Log。此外，若總步數超過 `MAX_STEPS` 亦會中斷。 | **路徑節點數限制**<br>插補軌跡以固定的 Segment Steps (如 30 或 40 步) 走完。如果在這些步數內 IK 找不到解，或者是關節限位導致自我碰撞，會直接被碰撞檢測觸發 Fail。 |
+
+---
+
+## 七、 狀態機設計演變與常數歷史說明 (History & Rationale)
+
+為方便後續維護，以下記錄狀態機中常數設計的由來，以及從助教範本（Template）演進到全新 8 階段狀態機的關鍵原因。
+
+### 1. 時間因子與常數的設計意圖
+* `_STEP_SCALE_FACTOR` (一般化 scaling，值為 `1.0`)：
+  * 相乘於 `_PHASE_DURATIONS_PER_OBJECT` 上，作為基準時間的縮放比例。
+* `_MAX_STEP_SCALE_FACTOR` (超時上限倍率，值為 `1.5`)：
+  * 用於計算各閉環對齊 Phase 的 `max_steps` 超時上限。例如基準步數為 270 步，超時上限即為 $270 \times 1.5 = 405$ 步。超過此步數若仍未到達 tolerance，將強制進入下一 Phase 並輸出診斷 Log。
+* `_MIN_STEP_SCALE_FACTOR` (最低執行步數倍率，值為 `0.1`)：
+  * 用於計算各對齊 Phase 的 `min_steps`。例如基準 270 步，最低需走滿 $270 \times 0.1 = 27$ 步。此設計是為了避免手臂在上一階段剛結束、新目標尚未更新的瞬間，因上一格暫態誤差極小而誤判定「已到達」進而發生跳關的情形。
+
+### 2. 關於 `_PHASE_DURATIONS_PER_OBJECT` 的使用位置
+* 此 Tuple 定義了每個物體生命週期內 8 個 Phase 的**基準持續時間**。
+* 在狀態機初始化時被讀入 `self._events_dt`：
+  ```python
+  self._events_dt: list[int] = list(_PHASE_DURATIONS_PER_OBJECT) * len(_PICK_ORDER)
+  ```
+  用來決定每一個 Event 的 `default_duration`，進而做為閉環 `min_steps` 與 `max_steps` 的計算基準。
+
+### 3. 範本與 Phase 5/6/7 設計演變歷史
+* **助教原始範本（Template，Commit `f84d85e`）**：
+  * **原設計為 7 個 Phase**（對照疊杯任務 `cup_stacking.py`）。
+  * 當時的 Phase 5 是「下放至擺放高度（Lower to release）」，期間夾爪保持**閉合**。
+  * 當時的 Phase 6 是「撤退（Retreat upward）」，期間夾爪**張開**。
+  * **助教將開爪與撤退混在一起的動機**：在杯子任務中，杯子底面積大且重，手臂一邊向上抬起一邊開爪，杯子會因重力自然留在桌上。這樣能省去原地開夾的步數，使動作更連貫。
+* **刀叉任務中的摩擦力問題**：
+  * 當此 7 階段範本直接套用在刀叉上時，因為刀叉極輕且薄，夾爪側面摩擦力很大。當手臂一邊抬起一邊開爪，**手指會直接把刀叉扯飛或使其在空中翻轉**，導致極高的失敗率。
+* **第一階段修復（XPPKP Commit `c6d1199`）**：
+  * 為了防止扯飛，將原本的 Phase 5 在程式碼內部拆成了兩個「子階段」：前 15 步做閉爪下降，後 25 步做原地開爪釋放。
+  * 這雖然解決了物理上的扯飛問題，但導致程式碼結構不乾淨（Phase 5 隱藏了兩種截然不同的動作與控制邏輯，且 `_events_dt` 難以對齊）。
+* **最終 8 階段重構（確保程式整潔性）**：
+  * 我們正式將隱藏的子階段抽離，重構成乾淨的 **8 階段狀態機**：
+    * **Phase 5 (Lower to release)**：垂直下放至擺放高度，夾爪保持閉合（運動結束即切換）。
+    * **Phase 6 (Open gripper to release)**：原地保持完全靜止，夾爪張開釋放（開環計時 25 步，讓物件完全平穩）。
+    * **Phase 7 (Retreat upward)**：空夾爪垂直升起至安全高度（Z = 22 cm），避免橫向橫掃時撞翻已擺好的餐具。
 

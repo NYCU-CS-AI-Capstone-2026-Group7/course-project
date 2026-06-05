@@ -472,8 +472,8 @@ def main():
                     dynamic_reset_gripper_effort_limit_sim(env, device)
 
                 if sm.is_episode_done:
-                    # Only wait for 300 steps (5s) to settle if we completed all robot actions naturally (event >= 14)
-                    # If it was an early abort (event < 14), we skip settling and end immediately.
+                    # Only wait for 300 steps (5s) to settle if we completed all robot actions naturally (event >= 16)
+                    # If it was an early abort (event < 16), we skip settling and end immediately.
                     need_settle = (sm._event >= len(sm._events_dt))
                     if need_settle and settling_steps < 300:
                         actions = sm.get_action(env)
@@ -520,8 +520,8 @@ def main():
 
                     # Early termination optimization (only for failed grasp, success is validated after settle)
                     if args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
-                        # event == 3 is right after knife lift phase; event == 10 is right after fork lift phase
-                        if (sm._event == 3 or sm._event == 10) and sm._step_count == 150:
+                        # event == 3 is right after knife lift phase; event == 11 is right after fork lift phase
+                        if (sm._event == 3 or sm._event == 11) and sm._step_count == 150:
                             target_obj = "knife" if sm._event == 3 else "fork"
                             # Get object Z relative to env origin
                             obj_z = env.scene[target_obj].data.root_pos_w[0, 2].item() - env.scene.env_origins[0, 2].item()

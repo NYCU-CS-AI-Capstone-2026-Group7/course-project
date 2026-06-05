@@ -42,7 +42,7 @@ _IK_DLS_LAMBDA = 0.01
 
 _HOVER_Z_OFFSET = 0.15
 _GRASP_Z_OFFSET = 0.08
-_LIFT_Z_OFFSET = 0.2
+_LIFT_Z_OFFSET = 0.22
 _RELEASE_Z_OFFSET = 0.09
 _GRIPPER_DOWN_ROLL_W = math.pi
 _GRIPPER_DOWN_PITCH_W = 0.0
@@ -80,8 +80,10 @@ _FRANKA_REST_JOINT_POS = {
 _PICK_ORDER = (_KNIFE_NAME, _FORK_NAME)
 _PLACE_X_SIGNS = (+1.0, -1.0)  # fork → +x of plate, knife → -x of plate
 
-_TIME_SCALE_FACTOR = 1.5
-_PHASE_DURATIONS_PER_OBJECT = tuple(int(d * _TIME_SCALE_FACTOR) for d in (180, 130, 20, 160, 170, 40, 30))
+_STEP_SCALE_FACTOR = 1.0
+_MAX_STEP_SCALE_FACTOR = 1.5
+_MIN_STEP_SCALE_FACTOR = 0.1
+_PHASE_DURATIONS_PER_OBJECT = tuple(int(d * _STEP_SCALE_FACTOR) for d in (270, 130, 20, 160, 255, 15, 25, 30))
 _PHASES_PER_OBJECT = len(_PHASE_DURATIONS_PER_OBJECT)
 
 _PHASE_NAMES = {
@@ -91,7 +93,8 @@ _PHASE_NAMES = {
     3: "Lift object upward",
     4: "Move above target position (beside plate)",
     5: "Lower to release",
-    6: "Retreat upward"
+    6: "Open gripper to release",
+    7: "Retreat upward"
 }
 
 
@@ -167,19 +170,20 @@ class CutleryArrangementStateMachine(StateMachineBase):
     The action vector is ``[panda_joint1, ..., panda_joint7, gripper]``.
     """
 
-    _ph_durations = tuple(int(d * _TIME_SCALE_FACTOR) for d in (180, 130, 20, 160, 170, 40, 30))
+    _ph_durations = _PHASE_DURATIONS_PER_OBJECT
     _ph_timeouts = (
-        int(2.25 * _ph_durations[0]),  # Phase 0
-        int(2.25 * _ph_durations[1]),  # Phase 1
-        _ph_durations[2],              # Phase 2
-        int(2.25 * _ph_durations[3]),  # Phase 3
-        int(2.25 * _ph_durations[4]),  # Phase 4
-        int(35 * _TIME_SCALE_FACTOR * _TIME_SCALE_FACTOR) + int(25 * _TIME_SCALE_FACTOR),  # Phase 5 (Lowering timeout double-scaled + Release duration scaled)
-        int(2.25 * _ph_durations[6])   # Phase 6
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[0]),  # Phase 0
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[1]),  # Phase 1
+        _ph_durations[2],                                # Phase 2
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[3]),  # Phase 3
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[4]),  # Phase 4
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[5]),  # Phase 5
+        _ph_durations[6],                                # Phase 6
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[7])   # Phase 7
     )
     MAX_STEPS: int = len(_PICK_ORDER) * sum(_ph_timeouts) + 100
     EPSILON_POS: float = 0.03
-    EPSILON_ROT: float = 0.25
+    EPSILON_ROT: float = 0.10
 
     def __init__(self) -> None:
         self._step_count: int = 0
@@ -198,7 +202,6 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._events_dt: list[int] = list(_PHASE_DURATIONS_PER_OBJECT) * len(_PICK_ORDER)
         self._last_target_pos_w: torch.Tensor | None = None
         self._last_target_quat_w: torch.Tensor | None = None
-        self._phase5_lowered: bool = False
         self._last_advance_with_env: bool = False
         self._initial_obj_pos_w: torch.Tensor | None = None
         self._initial_obj_quat_w: torch.Tensor | None = None
@@ -327,6 +330,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
             target_pos_w, gripper_cmd = self._phase_move_above_place(place_target_w, num_envs, device)
         elif phase_in_cycle == 5:
             target_pos_w, gripper_cmd = self._phase_lower_to_release(place_target_w, num_envs, device)
+        elif phase_in_cycle == 6:
+            target_pos_w, gripper_cmd = self._phase_open_gripper(place_target_w, num_envs, device)
         else:
             target_pos_w, gripper_cmd = self._phase_retreat(place_target_w, num_envs, device)
 
@@ -374,15 +379,12 @@ class CutleryArrangementStateMachine(StateMachineBase):
     def _phase_lower_to_release(self, place_pos_w, num_envs, device):
         target = place_pos_w.clone()
         target[:, 2] += _RELEASE_Z_OFFSET
-        
-        # Backward-compatible check: if we advanced without env, use time-based step count,
-        # otherwise use closed-loop _phase5_lowered flag
-        is_lowered = (self._step_count >= int(15 * _TIME_SCALE_FACTOR)) if not getattr(self, "_last_advance_with_env", False) else self._phase5_lowered
-        
-        if not is_lowered:
-            return target, _constant_gripper(num_envs, device, _GRIPPER_CLOSE)
-        else:
-            return target, _constant_gripper(num_envs, device, _GRIPPER_OPEN)
+        return target, _constant_gripper(num_envs, device, _GRIPPER_CLOSE)
+
+    def _phase_open_gripper(self, place_pos_w, num_envs, device):
+        target = place_pos_w.clone()
+        target[:, 2] += _RELEASE_Z_OFFSET
+        return target, _constant_gripper(num_envs, device, _GRIPPER_OPEN)
 
     def _phase_retreat(self, place_pos_w, num_envs, device):
         target = place_pos_w.clone()
@@ -471,40 +473,23 @@ class CutleryArrangementStateMachine(StateMachineBase):
             default_duration = self._events_dt[self._event]
             obj_name = _PICK_ORDER[self._current_object_idx]
             
-            if phase_in_cycle == 2:
-                # Phase 2: Close gripper to grasp (purely time-based finger closing)
+            if phase_in_cycle == 2 or phase_in_cycle == 6:
+                # Phase 2: Close gripper to grasp
+                # Phase 6: Open gripper to release
+                # (Both are purely time-based open-loop durations)
                 if self._step_count < default_duration:
                     return
                 self._event += 1
                 self._step_count = 0
-            elif phase_in_cycle == 5:
-                # Phase 5: Lower and release (two subphases)
-                if not self._phase5_lowered:
-                    # Subphase 5.1: Lowering
-                    arrived = self.check_arrival(env).all()
-                    # Enforce a minimum of steps to allow motion, and maximum steps timeout
-                    min_steps = max(5, int(5 * _TIME_SCALE_FACTOR))
-                    max_steps = int(35 * _TIME_SCALE_FACTOR * _TIME_SCALE_FACTOR)
-                    if arrived and self._step_count >= min_steps:
-                        self._phase5_lowered = True
-                        self._step_count = 0
-                    elif self._step_count >= max_steps:
-                        self._log_timeout_diagnostics(env, "Lowering to release", max_steps)
-                        self._phase5_lowered = True
-                        self._step_count = 0
-                else:
-                    # Subphase 5.2: Opening gripper to release (purely time-based release duration)
-                    release_duration = int(25 * _TIME_SCALE_FACTOR)
-                    if self._step_count < release_duration:
-                        return
-                    self._event += 1
-                    self._step_count = 0
-                    self._phase5_lowered = False
             else:
-                # Movement phases: 0, 1, 3, 4, 6
+                # Movement phases: 0, 1, 3, 4, 5, 7
                 arrived = self.check_arrival(env).all()
-                min_steps = max(10, int(0.10 * default_duration))
-                max_steps = int(2.25 * default_duration)
+                if phase_in_cycle == 5:
+                    min_steps = max(5, int(5 * _STEP_SCALE_FACTOR))
+                    max_steps = int(35 * _STEP_SCALE_FACTOR * _MAX_STEP_SCALE_FACTOR)
+                else:
+                    min_steps = max(10, int(_MIN_STEP_SCALE_FACTOR * default_duration))
+                    max_steps = int(_MAX_STEP_SCALE_FACTOR * default_duration)
                 
                 # Check if arrived after minimum steps or if we timed out
                 if arrived and self._step_count >= min_steps:
@@ -527,7 +512,6 @@ class CutleryArrangementStateMachine(StateMachineBase):
             self._initial_ee_pos_w = None
             self._gripper_down_yaw_w = None
             self._gripper_down_yaw_offset_w = None
-            self._phase5_lowered = False
             self._initial_obj_pos_w = None
             self._initial_obj_quat_w = None
 
@@ -541,7 +525,6 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._gripper_down_yaw_offset_w = None
         self._last_target_pos_w = None
         self._last_target_quat_w = None
-        self._phase5_lowered = False
         self._last_advance_with_env = False
         self._initial_obj_pos_w = None
         self._initial_obj_quat_w = None
