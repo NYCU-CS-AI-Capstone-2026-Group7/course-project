@@ -51,7 +51,7 @@ _GRIPPER_DOWN_YAW_OFFSET_RANGE = (-0.15, 0.15)
 # jitter. Cutlery items are elongated, so π/2 closes the fingers across the
 # short axis. Per-USD orientation correction lives in env_cfg's
 # ``per_object_yaw_offset``.
-_GRASP_YAW_OFFSET: float = math.pi / 2.0
+_GRASP_YAW_OFFSET: float = -math.pi / 2.0
 # Horizontal retreat (m) toward the robot base applied to approach + grasp
 # targets. Per-object so each cutlery item can be tuned independently
 # (e.g. knife may grab better with no retreat than fork).
