@@ -48,10 +48,9 @@ _GRIPPER_DOWN_ROLL_W = math.pi
 _GRIPPER_DOWN_PITCH_W = 0.0
 _GRIPPER_DOWN_YAW_OFFSET_RANGE = (-0.15, 0.15)
 # Grasp yaw bias (rad) on top of the object's world yaw, before the random
-# jitter. Cutlery items are elongated, so π/2 closes the fingers across the
-# short axis. Per-USD orientation correction lives in env_cfg's
-# ``per_object_yaw_offset``.
-_GRASP_YAW_OFFSET: float = -math.pi / 2.0
+# jitter. Cutlery items are elongated, so 0.0 closes the fingers across the
+# short axis (gripper Y axis is perpendicular to gripper X axis).
+_GRASP_YAW_OFFSET: float = math.pi / 2.0
 # Horizontal retreat (m) toward the robot base applied to approach + grasp
 # targets. Per-object so each cutlery item can be tuned independently
 # (e.g. knife may grab better with no retreat than fork).
@@ -417,7 +416,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         if phase_in_cycle == 4:
             # In Phase 4, _last_target_quat_w is interpolating, so it's not the final destination.
             # We must compute the final place quat to check arrival properly.
-            target_obj_yaw = math.pi if _PICK_ORDER[self._current_object_idx] == _FORK_NAME else 0.0
+            target_obj_yaw = 0.0 if _PICK_ORDER[self._current_object_idx] == _FORK_NAME else math.pi
             place_yaw = target_obj_yaw + _GRASP_YAW_OFFSET + self._gripper_place_yaw_offset_w
             roll = torch.full((env.num_envs,), _GRIPPER_DOWN_ROLL_W, device=env.device, dtype=ee_quat.dtype)
             pitch = torch.full((env.num_envs,), _GRIPPER_DOWN_PITCH_W, device=env.device, dtype=ee_quat.dtype)
@@ -652,7 +651,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
             # Generate a new place noise from normal distribution (std = 2.86 deg / 0.05 rad, clipped at +- 5.72 deg / 0.10 rad)
             self._ensure_place_yaw_offset_w(num_envs, device, dtype)
             
-            target_obj_yaw = math.pi if obj_name == _FORK_NAME else 0.0
+            target_obj_yaw = 0.0 if obj_name == _FORK_NAME else math.pi
             place_yaw = target_obj_yaw + yaw_offset + self._gripper_place_yaw_offset_w
             
             if phase_in_cycle == 4:
