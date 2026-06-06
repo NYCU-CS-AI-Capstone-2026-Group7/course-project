@@ -357,6 +357,7 @@ def main():
     import shutil
     real_dataset_file = args_cli.dataset_file
     tmp_dataset_file = real_dataset_file + ".tmp"
+    failed_poses_file = real_dataset_file + "_failed.json"
 
     if args_cli.record and not args_cli.use_lerobot_recorder:
         if args_cli.resume and os.path.exists(real_dataset_file):
@@ -453,8 +454,29 @@ def main():
         except Exception as e:
             print(f"[WARNING] Failed to parse completed pose indices: {e}")
 
-    remaining_pose_indices = [i for i in range(len(episodes)) if i not in completed_pose_indices]
+    failed_pose_indices = []
+    if args_cli.record and args_cli.resume:
+        try:
+            if os.path.exists(failed_poses_file):
+                import json
+                with open(failed_poses_file, "r") as f:
+                    failed_pose_indices = json.load(f)
+                # Filter out poses that were successfully completed in later runs
+                failed_pose_indices = [i for i in failed_pose_indices if i not in completed_pose_indices]
+                print(f"[INFO] Loaded {len(failed_pose_indices)} failed pose indices to try later.")
+        except Exception as e:
+            print(f"[WARNING] Failed to load failed pose indices: {e}")
+
+    # Prioritize poses that have never been tried (neither success nor failed yet)
+    unused_pose_indices = [
+        i for i in range(len(episodes))
+        if i not in completed_pose_indices and i not in failed_pose_indices
+    ]
+    # Chain them: unused first, then retrying previously failed ones
+    remaining_pose_indices = unused_pose_indices + failed_pose_indices
     print(f"[INFO] Poses remaining to generate: {len(remaining_pose_indices)} / {len(episodes)}")
+    print(f"  - Unused (Priority): {len(unused_pose_indices)}")
+    print(f"  - Previously Failed (Retry later): {len(failed_pose_indices)}")
 
     if not remaining_pose_indices:
         print("[INFO] All episodes already completed. Exiting.")
@@ -511,8 +533,35 @@ def main():
                             print(f"\033[92m[Data Usage] Pose {finished_pose_idx + 1}/{len(episodes)} success. (Total Success: {current_recorded_demo_count})\033[0m")
                             success_ID.append(cnt)
                             cnt += 1
+                            if args_cli.record:
+                                try:
+                                    if os.path.exists(failed_poses_file):
+                                        import json
+                                        with open(failed_poses_file, "r") as f:
+                                            f_list = json.load(f)
+                                        if finished_pose_idx in f_list:
+                                            f_list.remove(finished_pose_idx)
+                                            with open(failed_poses_file, "w") as f:
+                                                json.dump(f_list, f)
+                                                print(f"[INFO] Removed Pose {finished_pose_idx} from failed list.")
+                                except Exception as err:
+                                    print(f"[WARNING] Failed to update failed list on success: {err}")
                         else:
                             print(f"\033[91m[Data Usage] Pose {finished_pose_idx + 1}/{len(episodes)} fail. (Total Success: {current_recorded_demo_count})\033[0m")
+                            if args_cli.record:
+                                try:
+                                    import json
+                                    f_list = []
+                                    if os.path.exists(failed_poses_file):
+                                        with open(failed_poses_file, "r") as f:
+                                            f_list = json.load(f)
+                                    if finished_pose_idx not in f_list:
+                                        f_list.append(finished_pose_idx)
+                                        with open(failed_poses_file, "w") as f:
+                                            json.dump(f_list, f)
+                                            print(f"[INFO] Added Pose {finished_pose_idx} to failed list.")
+                                except Exception as err:
+                                    print(f"[WARNING] Failed to save failed pose to file: {err}")
 
                         # ------------------------------------------------------
                         # Save episode progress safely (write to tmp -> rename to real)
