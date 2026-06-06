@@ -354,6 +354,16 @@ def main():
         )
     SMClass, device = TASK_REGISTRY[task_name]
 
+    import shutil
+    real_dataset_file = args_cli.dataset_file
+    tmp_dataset_file = real_dataset_file + ".tmp"
+
+    if args_cli.record and not args_cli.use_lerobot_recorder:
+        if args_cli.resume and os.path.exists(real_dataset_file):
+            print(f"[INFO] Copying {real_dataset_file} to {tmp_dataset_file} for resume recording.")
+            shutil.copyfile(real_dataset_file, tmp_dataset_file)
+        args_cli.dataset_file = tmp_dataset_file
+
     output_dir = os.path.dirname(args_cli.dataset_file)
     output_file_name = os.path.splitext(os.path.basename(args_cli.dataset_file))[0]
     if output_dir and not os.path.exists(output_dir):
@@ -503,6 +513,35 @@ def main():
                             cnt += 1
                         else:
                             print(f"\033[91m[Data Usage] Pose {finished_pose_idx + 1}/{len(episodes)} fail. (Total Success: {current_recorded_demo_count})\033[0m")
+
+                        # ------------------------------------------------------
+                        # Save episode progress safely (write to tmp -> rename to real)
+                        # ------------------------------------------------------
+                        if args_cli.record and not args_cli.use_lerobot_recorder:
+                            print(f"[INFO] Saving episode progress safely to {real_dataset_file}...")
+                            try:
+                                if hasattr(env.recorder_manager, "finalize"):
+                                    env.recorder_manager.finalize()
+                                if os.path.exists(tmp_dataset_file):
+                                    os.replace(tmp_dataset_file, real_dataset_file)
+                                    print(f"[INFO] Progress saved successfully.")
+                                
+                                if not should_break:
+                                    # Copy the stable file back to tmp to continue appending
+                                    shutil.copyfile(real_dataset_file, tmp_dataset_file)
+                                    # Force resume mode for next episodes
+                                    args_cli.resume = True
+                                    _configure_env_cfg(env_cfg, args_cli, is_direct_env, output_dir, output_file_name)
+                                    _replace_recorder_manager(env, env_cfg, args_cli)
+                                    if hasattr(env.recorder_manager, "_dataset_file_handler"):
+                                        env.recorder_manager._dataset_file_handler.current_pose_idx = current_pose_idx
+                                        resume_recorded_demo_count = env.recorder_manager._dataset_file_handler.get_num_episodes()
+                            except Exception as save_err:
+                                print(f"[ERROR] Failed to save episode progress: {save_err}")
+                                import traceback
+                                traceback.print_exc()
+                        # ------------------------------------------------------
+
                         if should_break:
                             break
                 else:
@@ -543,6 +582,9 @@ def main():
                 try:
                     env.recorder_manager.finalize()
                     print("[INFO] Dataset finalized and committed successfully!")
+                    if not args_cli.use_lerobot_recorder and os.path.exists(tmp_dataset_file):
+                        os.replace(tmp_dataset_file, real_dataset_file)
+                        print(f"[INFO] Final progress saved successfully to {real_dataset_file}")
                 except Exception as finalize_err:
                     print(f"\n[ERROR] Failed to finalize dataset: {finalize_err}")
                     import traceback
