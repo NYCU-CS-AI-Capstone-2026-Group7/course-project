@@ -198,6 +198,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._gripper_down_yaw_w: torch.Tensor | None = None
         self._gripper_down_yaw_offset_w: torch.Tensor | None = None
         self._gripper_place_yaw_offset_w: torch.Tensor | None = None
+        self._target_q7: torch.Tensor | None = None
+        self._initial_q7: torch.Tensor | None = None
         self._current_object_idx: int = 0
         self._event: int = 0
         self._events_dt: list[int] = list(_PHASE_DURATIONS_PER_OBJECT) * len(_PICK_ORDER)
@@ -300,6 +302,22 @@ class CutleryArrangementStateMachine(StateMachineBase):
             yaw_offset=_GRASP_YAW_OFFSET,
             phase_in_cycle=phase_in_cycle,
         )
+
+        # Calculate joint 7 targets for joint space interpolation
+        if phase_in_cycle >= 3 and self._target_q7 is None:
+            current_q7 = robot.data.joint_pos[:, self._arm_joint_ids[6]].clone()
+            self._initial_q7 = current_q7.clone()
+            
+            if self._gripper_place_yaw_offset_w is None or self._gripper_place_yaw_offset_w.shape[0] != num_envs:
+                noise = torch.randn(num_envs, device=device, dtype=obj_pos_w_ref.dtype)
+                self._gripper_place_yaw_offset_w = torch.clamp(noise * 0.05, min=-0.10, max=0.10)
+                
+            target_obj_yaw = math.pi if obj_name == _FORK_NAME else 0.0
+            place_yaw = target_obj_yaw + _GRASP_YAW_OFFSET + self._gripper_place_yaw_offset_w
+            grasp_yaw = self._gripper_down_yaw_w.to(device=device, dtype=obj_pos_w_ref.dtype)
+            
+            delta_q7 = (place_yaw - grasp_yaw + math.pi) % (2.0 * math.pi) - math.pi
+            self._target_q7 = current_q7 + delta_q7
 
         # Calculate local frame offset away from the tip (towards the handle)
         # Fork: tip points to +z, handle points to -z
@@ -412,10 +430,15 @@ class CutleryArrangementStateMachine(StateMachineBase):
         # Position error: Euclidean distance
         pos_error = torch.norm(ee_pos - self._last_target_pos_w, dim=-1)
         
-        # Rotation error: Angle between quaternions in radians
-        dot_product = torch.sum(ee_quat * self._last_target_quat_w, dim=-1).abs()
-        dot_product = torch.clamp(dot_product, 0.0, 1.0)
-        rot_error = 2.0 * torch.acos(dot_product)
+        # Rotation error: Angle between quaternions in radians (or Joint 7 error in Phase 4)
+        phase_in_cycle = self._event % _PHASES_PER_OBJECT
+        if phase_in_cycle == 4 and self._target_q7 is not None:
+            current_q7 = robot.data.joint_pos[:, self._arm_joint_ids[6]]
+            rot_error = (current_q7 - self._target_q7).abs()
+        else:
+            dot_product = torch.sum(ee_quat * self._last_target_quat_w, dim=-1).abs()
+            dot_product = torch.clamp(dot_product, 0.0, 1.0)
+            rot_error = 2.0 * torch.acos(dot_product)
         
         epsilon_pos = self.EPSILON_POS
         epsilon_rot = self.EPSILON_ROT
@@ -520,6 +543,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
             self._gripper_down_yaw_w = None
             self._gripper_down_yaw_offset_w = None
             self._gripper_place_yaw_offset_w = None
+            self._target_q7 = None
+            self._initial_q7 = None
             self._initial_obj_pos_w = None
             self._initial_obj_quat_w = None
 
@@ -532,6 +557,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._gripper_down_yaw_w = None
         self._gripper_down_yaw_offset_w = None
         self._gripper_place_yaw_offset_w = None
+        self._target_q7 = None
+        self._initial_q7 = None
         self._last_target_pos_w = None
         self._last_target_quat_w = None
         self._last_advance_with_env = False
@@ -574,6 +601,20 @@ class CutleryArrangementStateMachine(StateMachineBase):
         joint_pos_target = self._arm_joint_pos(robot) + self._compute_delta_joint_pos(
             pose_delta_root, self._ee_jacobian_root(robot)
         )
+        
+        # Override Joint 7 target in joint space to prevent IK jumps and limits violation
+        phase_in_cycle = self._event % _PHASES_PER_OBJECT
+        if self._target_q7 is not None and phase_in_cycle >= 4:
+            if phase_in_cycle == 4:
+                # Interpolate from initial q7 to target q7
+                denom = max(self._events_dt[self._event] - 1, 1)
+                alpha = min(self._step_count / denom, 1.0)
+                interpolated_q7 = (1.0 - alpha) * self._initial_q7 + alpha * self._target_q7
+                joint_pos_target[:, 6] = interpolated_q7
+            else:
+                # Sustain target q7 during phase 5, 6, 7
+                joint_pos_target[:, 6] = self._target_q7
+                
         joint_pos_target = self._clamp_arm_joint_pos(robot, joint_pos_target)
         return torch.cat([joint_pos_target, gripper_cmd], dim=-1)
 
