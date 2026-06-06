@@ -37,15 +37,15 @@ except ImportError:
 # Table Dimensions
 _TABLE_SURFACE_Z = 0.5
 _TABLE_HEIGHT = 0.0409113
-_TABLE_LENGTH = 0.70
-_TABLE_WIDTH = 0.65
+_TABLE_LENGTH = 0.70  # X axis length
+_TABLE_WIDTH = 0.65   # Y axis length
+_TABLE_CENTER_X = 0.353162
+_TABLE_CENTER_Y = -0.351832
 
 _Z_SAFE = _TABLE_SURFACE_Z + 0.20
 _Z_GRASP = _TABLE_SURFACE_Z + 0.11
 _Z_RELEASE = _TABLE_SURFACE_Z + 0.11
 
-_CUTLERY_SPAWN_X = (0.25, 0.55)
-_CUTLERY_SPAWN_Y = (-0.60, -0.20)
 _MIN_SPAWN_DIST = 0.15
 
 _PLATE_POS = [0.50, -0.40, _TABLE_SURFACE_Z + 0.05]
@@ -90,8 +90,6 @@ def yaw_from_quat_wxyz(quat_wxyz):
 
 # Publicly exported constants for external scripts (e.g. generate_from_zero.py)
 TABLE_SURFACE_Z = _TABLE_SURFACE_Z
-CUTLERY_SPAWN_X = _CUTLERY_SPAWN_X
-CUTLERY_SPAWN_Y = _CUTLERY_SPAWN_Y
 FORK_Z = _FORK_Z
 KNIFE_Z = _KNIFE_Z
 
@@ -120,11 +118,24 @@ def normalize_angle(angle: float) -> float:
 class PyBulletFrankaValidator:
     """Validator using PyBullet physics engine for lightweight CPU simulations."""
 
-    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0, allow_plate_collision=False, arm_physics=False):
+    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0, allow_plate_collision=False, arm_physics=False, self_collision_margin=-0.01, robot_obj_collision_margin=0.005, obj_obj_collision_margin=0.005, spawn_margin=(0.12, 0.12, 0.15, 0.12)):
         self.use_gui = use_gui
         self.verbose = verbose
         self.sleep_time = 1.0 / fps if fps > 0 else 0.0
         self.min_dist = min_dist
+        self.self_collision_margin = self_collision_margin
+        self.robot_obj_collision_margin = robot_obj_collision_margin
+        self.obj_obj_collision_margin = obj_obj_collision_margin
+        self.spawn_margin = spawn_margin
+        
+        # Calculate dynamic cutlery spawn area based on spawn_margin
+        self.table_min_x = _TABLE_CENTER_X - (_TABLE_LENGTH / 2)
+        self.table_max_x = _TABLE_CENTER_X + (_TABLE_LENGTH / 2)
+        self.table_min_y = _TABLE_CENTER_Y - (_TABLE_WIDTH / 2)
+        self.table_max_y = _TABLE_CENTER_Y + (_TABLE_WIDTH / 2)
+        self.cutlery_spawn_x = (self.table_min_x + self.spawn_margin[3], self.table_max_x - self.spawn_margin[1])
+        self.cutlery_spawn_y = (self.table_min_y + self.spawn_margin[2], self.table_max_y - self.spawn_margin[0])
+
         self.reconnect_interval = reconnect_interval
         self.last_reconnect_time = time.time()
         self.allow_plate_collision = allow_plate_collision
@@ -378,61 +389,50 @@ class PyBulletFrankaValidator:
         return 999
 
     def check_collision(self, ignored_body_id=None):
-        """Checks for unintended collisions in the scene."""
-        p.performCollisionDetection()
-        
-        contact_points = p.getContactPoints()
-        for contact in contact_points:
-            body_a = contact[1]
-            body_b = contact[2]
-            
-            # If collision is with plane/ground or table, ignore
-            if body_a == self.plane_id or body_b == self.plane_id or \
-               body_a == self.table_id or body_b == self.table_id:
+        """Checks for unintended collisions in the scene using specific distance boundaries."""
+        # 1. Robot self-collision
+        closest_pts = p.getClosestPoints(self.robot_id, self.robot_id, distance=self.self_collision_margin)
+        for pt in closest_pts:
+            link_a, link_b = pt[3], pt[4]
+            # Exclude links with topological distance <= 2
+            topo_dist = self.get_topology_distance(link_a, link_b)
+            if topo_dist <= 2:
                 continue
-                
-            # If collision is between robot and a grabbed object, ignore
-            if ignored_body_id is not None:
-                if (body_a == self.robot_id and body_b == ignored_body_id) or \
-                   (body_b == self.robot_id and body_a == ignored_body_id):
-                    continue
-                    
-            # If robot collided with itself (self-collision)
-            if body_a == self.robot_id and body_b == self.robot_id:
-                link_a = contact[3]
-                link_b = contact[4]
-                
-                # Exclude links with topological distance <= 2 to avoid false self-collision reports
-                # (e.g., adjacent parent-child joints, sibling fingers, or adjacent-2 joints due to mesh overlap)
-                topo_dist = self.get_topology_distance(link_a, link_b)
-                if topo_dist <= 2:
-                    continue
-                
-                # Only consider it a collision if they are actually touching or penetrating significantly (distance <= -0.01)
-                if contact[8] > -0.01:
-                    continue
-                    
-                if self.verbose:
-                    print(f"[DEBUG] Self-collision: link {link_a} and link {link_b} at distance {contact[8]:.4f} (topo_dist={topo_dist})")
-                return True
+            if self.verbose:
+                print(f"[DEBUG] Self-collision: link {link_a} and link {link_b} at distance {pt[8]:.4f} (topo_dist={topo_dist})")
+            return True
 
-            # If collision is between table objects (e.g. fork and knife) and they actually touch/penetrate
-            if body_a in self.objects.values() and body_b in self.objects.values():
-                if contact[8] <= 0.0:
-                    name_a = next((k for k, v in self.objects.items() if v == body_a), str(body_a))
-                    name_b = next((k for k, v in self.objects.items() if v == body_b), str(body_b))
-                    if self.allow_plate_collision and ("plate" in (name_a, name_b)):
-                        continue
+        # 2. Table objects vs each other
+        obj_ids = list(self.objects.values())
+        for i in range(len(obj_ids)):
+            for j in range(i+1, len(obj_ids)):
+                body_a, body_b = obj_ids[i], obj_ids[j]
+                
+                name_a = next((k for k, v in self.objects.items() if v == body_a), str(body_a))
+                name_b = next((k for k, v in self.objects.items() if v == body_b), str(body_b))
+                
+                if self.allow_plate_collision and ("plate" in (name_a, name_b)):
+                    continue
+                    
+                pts = p.getClosestPoints(body_a, body_b, distance=self.obj_obj_collision_margin)
+                if pts:
                     if self.verbose:
-                        print(f"[DEBUG] Object-object collision: {name_a} and {name_b} at distance {contact[8]:.4f}")
+                        print(f"[DEBUG] Object-object collision: {name_a} and {name_b} at distance {pts[0][8]:.4f}")
                     return True
 
-            # If robot collided with table objects (unintended contact)
-            if body_a == self.robot_id or body_b == self.robot_id:
-                other_body = body_b if body_a == self.robot_id else body_a
-                if self.allow_plate_collision and other_body == self.objects.get("plate"):
-                    continue
+        # 3. Robot vs Table objects
+        for name, obj_id in self.objects.items():
+            if obj_id == ignored_body_id:
+                continue
+            if self.allow_plate_collision and name == "plate":
+                continue
+                
+            pts = p.getClosestPoints(self.robot_id, obj_id, distance=self.robot_obj_collision_margin)
+            if pts:
+                if self.verbose:
+                    print(f"[DEBUG] Robot-object collision: robot and {name} at distance {pts[0][8]:.4f}")
                 return True
+                
         return False
 
     def validate_trajectory(self, obj_pos, obj_yaw, target_place_pos, obj_name, target_yaw=0.0):
@@ -684,12 +684,12 @@ class PyBulletFrankaValidator:
 
     def run_procedural_test(self, return_details=False):
         """Randomizes spawns and checks kinematics and collisions."""
-        # Randomize spawn positions in a shared area and ensure no overlap (min distance 0.15m)
+        # Randomize spawn positions in a shared area and ensure no overlap (min distance)
         while True:
-            f_x = random.uniform(*CUTLERY_SPAWN_X)
-            f_y = random.uniform(*CUTLERY_SPAWN_Y)
-            k_x = random.uniform(*CUTLERY_SPAWN_X)
-            k_y = random.uniform(*CUTLERY_SPAWN_Y)
+            f_x = random.uniform(*self.cutlery_spawn_x)
+            f_y = random.uniform(*self.cutlery_spawn_y)
+            k_x = random.uniform(*self.cutlery_spawn_x)
+            k_y = random.uniform(*self.cutlery_spawn_y)
             
             # Check Euclidean distance between fork and knife centers
             dist = math.sqrt((f_x - k_x)**2 + (f_y - k_y)**2)
@@ -754,6 +754,32 @@ def main():
         action="store_true",
         help="Enable physical joint-motor control instead of kinematic joint resets."
     )
+    parser.add_argument(
+        "--self_collision_margin",
+        type=float,
+        default=-0.01,
+        help="Margin for robot self collisions (default: -0.01).",
+    )
+    parser.add_argument(
+        "--robot_obj_collision_margin",
+        type=float,
+        default=0.005,
+        help="Margin for robot-to-object collisions (default: 0.005).",
+    )
+    parser.add_argument(
+        "--obj_obj_collision_margin",
+        type=float,
+        default=0.005,
+        help="Margin for object-to-object collisions (default: 0.005).",
+    )
+    parser.add_argument(
+        "--spawn_margin",
+        type=float,
+        nargs=4,
+        default=[0.12, 0.12, 0.15, 0.12],
+        metavar=("TOP", "RIGHT", "BOTTOM", "LEFT"),
+        help="Table inner margin for spawn area: Top Right Bottom Left in meters (default: 0.12 0.12 0.15 0.12).",
+    )
     args = parser.parse_args()
     
     validator = PyBulletFrankaValidator(
@@ -763,7 +789,11 @@ def main():
         min_dist=args.min_dist,
         reconnect_interval=args.reconnect_interval,
         allow_plate_collision=args.allow_plate_collision,
-        arm_physics=args.arm_physics
+        arm_physics=args.arm_physics,
+        self_collision_margin=args.self_collision_margin,
+        robot_obj_collision_margin=args.robot_obj_collision_margin,
+        obj_obj_collision_margin=args.obj_obj_collision_margin,
+        spawn_margin=tuple(args.spawn_margin)
     )
     validator.fix_knife_yaw = args.fix_knife_yaw
     validator.fix_fork_yaw = args.fix_fork_yaw

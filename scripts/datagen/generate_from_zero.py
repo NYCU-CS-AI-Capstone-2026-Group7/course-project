@@ -93,6 +93,32 @@ def main():
         action="store_true",
         help="Enable physical joint-motor control in PyBullet validator."
     )
+    parser.add_argument(
+        "--self_collision_margin",
+        type=float,
+        default=-0.01,
+        help="Margin for robot self collisions (default: -0.01).",
+    )
+    parser.add_argument(
+        "--robot_obj_collision_margin",
+        type=float,
+        default=0.005,
+        help="Margin for robot-to-object collisions (default: 0.005).",
+    )
+    parser.add_argument(
+        "--obj_obj_collision_margin",
+        type=float,
+        default=0.005,
+        help="Margin for object-to-object collisions (default: 0.005).",
+    )
+    parser.add_argument(
+        "--spawn_margin",
+        type=float,
+        nargs=4,
+        default=[0.12, 0.12, 0.15, 0.12],
+        metavar=("TOP", "RIGHT", "BOTTOM", "LEFT"),
+        help="Table inner margin for spawn area: Top Right Bottom Left in meters (default: 0.12 0.12 0.15 0.12).",
+    )
     args = parser.parse_args()
 
     output_path = Path(args.output)
@@ -121,7 +147,11 @@ def main():
         verbose=args.verbose,
         reconnect_interval=args.reconnect_interval,
         allow_plate_collision=args.allow_plate_collision,
-        arm_physics=args.arm_physics
+        arm_physics=args.arm_physics,
+        self_collision_margin=args.self_collision_margin,
+        robot_obj_collision_margin=args.robot_obj_collision_margin,
+        obj_obj_collision_margin=args.obj_obj_collision_margin,
+        spawn_margin=tuple(args.spawn_margin)
     )
 
     episodes = []
