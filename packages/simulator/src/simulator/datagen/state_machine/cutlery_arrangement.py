@@ -50,7 +50,7 @@ _GRIPPER_DOWN_YAW_OFFSET_RANGE = (-0.15, 0.15)
 # Grasp yaw bias (rad) on top of the object's world yaw, before the random
 # jitter. Cutlery items are elongated, so 0.0 closes the fingers across the
 # short axis (gripper Y axis is perpendicular to gripper X axis).
-_GRASP_YAW_OFFSET: float = math.pi / 2.0
+_GRASP_YAW_OFFSET: float = -math.pi / 2.0
 # Horizontal retreat (m) toward the robot base applied to approach + grasp
 # targets. Per-object so each cutlery item can be tuned independently
 # (e.g. knife may grab better with no retreat than fork).

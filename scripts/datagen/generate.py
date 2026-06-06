@@ -321,7 +321,7 @@ def _check_cutlery_early_abort(env, sm) -> None:
 
     # 1. Knife placed (event 8, step 0): check knife yaw
     if sm._event == 8:
-        k_ok, k_yaw, k_diff_deg = _check_cutlery_yaw_mismatch(env, "knife", 0.0)
+        k_ok, k_yaw, k_diff_deg = _check_cutlery_yaw_mismatch(env, "knife", math.pi)
         if not k_ok:
             print(f"[INFO] Early abort: Knife yaw mismatch (yaw={math.degrees(k_yaw):.1f}° | diff={k_diff_deg:.1f}° > 15.0°).")
             sm._episode_done = True
@@ -329,7 +329,7 @@ def _check_cutlery_early_abort(env, sm) -> None:
 
     # 2. Fork placed (event 16, step 0): check fork yaw
     if sm._event == 16:
-        f_ok, f_yaw, f_diff_deg = _check_cutlery_yaw_mismatch(env, "fork", math.pi)
+        f_ok, f_yaw, f_diff_deg = _check_cutlery_yaw_mismatch(env, "fork", 0)
         if not f_ok:
             print(f"[INFO] Early abort: Fork yaw mismatch (yaw={math.degrees(f_yaw):.1f}° | diff={f_diff_deg:.1f}° > 15.0°).")
             sm._event = 15  # Set back to 15 so we skip the 300-step settle and end immediately
