@@ -66,8 +66,8 @@ while true; do
                 
                 echo "[INFO] Creating static directory snapshot using rsync to prevent read/write race condition..."
                 mkdir -p "$SNAPSHOT_DIR"
-                # 使用 rsync 增量複製到臨時目錄，排除上傳期間的檔案變動鎖死
-                rsync -a --delete "$DIR_PATH/" "$SNAPSHOT_DIR/"
+                # 使用 rsync 增量複製到臨時目錄，排除上傳期間的檔案變動鎖死與殘留的 tmp* 檔案
+                rsync -a --delete --exclude "tmp*" "$DIR_PATH/" "$SNAPSHOT_DIR/"
                 
                 # 執行上傳指令
                 if [ "$OVERWRITE_REMOTE" = true ] && [ "${IS_FIRST_UPLOAD[$KEY]}" = true ]; then
