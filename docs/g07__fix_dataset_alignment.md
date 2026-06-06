@@ -22,12 +22,22 @@ This document records the analysis and fixings applied to resolve the dataset in
    Applied the core code fixes to both `/tmp/.venv` and `.venv` environments.
 
 ## How to Replicate
-1. **Run the patch script**:
+1. **Merge Datasets (Official Method - Recommended)**:
+   Instead of custom merging, use the official LeRobot editing tool to merge the datasets. Run the following command on the remote VM:
+   ```bash
+   lerobot-edit-dataset \
+       --repo_id XiaoPanPanKevinPan/cutlery_v2_replay_merged \
+       --operation.type merge \
+       --operation.repo_ids "['XiaoPanPanKevinPan/aicapstone_group7_cutlery_v2_replay', 'XiaoPanPanKevinPan/aicapstone_group7_cutlery_v2_replay_2']" \
+       --push_to_hub true
+   ```
+   This tool standardizes the video alignment and parquet format.
+2. **Run the patch script**:
    ```bash
    python scripts/patch_lerobot_video_utils.py
    ```
    This script automatically applies the index-clipping and tolerance-bypass patches to both `/tmp/.venv` and `/root/course-project/.venv` environments.
-2. **Run the training script**:
+3. **Run the training script**:
    Use standard Hydra commands to run training using the officially merged dataset:
    ```bash
    lerobot-train \
