@@ -59,7 +59,16 @@ def main():
     print(f"[INFO] Dataset 1: {n_ep1} episodes, {n_fr1} frames")
     print(f"[INFO] Dataset 2: {n_ep2} episodes, {n_fr2} frames")
 
-    # 1. Process data Parquets
+    # 1. Pre-compute video offsets for index shifting
+    video_offset_map = {}
+    video_channels1 = [os.path.basename(p) for p in glob.glob(os.path.join(src1, "videos", "*")) if os.path.isdir(p)]
+    video_channels2 = [os.path.basename(p) for p in glob.glob(os.path.join(src2, "videos", "*")) if os.path.isdir(p)]
+    
+    for chan in video_channels1:
+        chan_files = sorted(glob.glob(os.path.join(src1, "videos", chan, "chunk-*", "*.mp4")))
+        video_offset_map[chan] = len(chan_files)
+
+    # 2. Process data Parquets
     print("[INFO] Processing data parquets...")
     src1_data_files = sorted(glob.glob(os.path.join(src1, "data", "chunk-*", "*.parquet")))
     src2_data_files = sorted(glob.glob(os.path.join(src2, "data", "chunk-*", "*.parquet")))
@@ -75,9 +84,17 @@ def main():
         df = pd.read_parquet(f)
         df["index"] = df["index"] + n_fr1
         df["episode_index"] = df["episode_index"] + n_ep1
+        
+        # Shift video file_index in data tables
+        for col in df.columns:
+            if col.startswith("videos/") and col.endswith("/file_index"):
+                chan_name = col.split("/")[1]
+                offset = video_offset_map.get(chan_name, 0)
+                df[col] = df[col] + offset
+                
         df.to_parquet(dest, index=False)
 
-    # 2. Process meta/episodes Parquets
+    # 3. Process meta/episodes Parquets
     print("[INFO] Processing episodes metadata parquets...")
     src1_ep_files = sorted(glob.glob(os.path.join(src1, "meta", "episodes", "chunk-*", "*.parquet")))
     src2_ep_files = sorted(glob.glob(os.path.join(src2, "meta", "episodes", "chunk-*", "*.parquet")))
@@ -88,18 +105,13 @@ def main():
         shutil.copyfile(f, dest)
     e1_count = len(src1_ep_files)
 
-    # 3. Process video offsets
-    video_offset_map = {}
-    video_channels1 = [os.path.basename(p) for p in glob.glob(os.path.join(src1, "videos", "*")) if os.path.isdir(p)]
-    video_channels2 = [os.path.basename(p) for p in glob.glob(os.path.join(src2, "videos", "*")) if os.path.isdir(p)]
-    
+    # 4. Copy and shift video files
     for chan in video_channels1:
         os.makedirs(os.path.join(target, "videos", chan, "chunk-000"), exist_ok=True)
         chan_files = sorted(glob.glob(os.path.join(src1, "videos", chan, "chunk-*", "*.mp4")))
         for idx, f in enumerate(chan_files):
             dest = os.path.join(target, "videos", chan, "chunk-000", f"file-{idx:03d}.mp4")
             shutil.copyfile(f, dest)
-        video_offset_map[chan] = len(chan_files)
 
     for idx, f in enumerate(src2_ep_files):
         dest = os.path.join(target, "meta", "episodes", "chunk-000", f"file-{(idx + e1_count):03d}.parquet")
