@@ -198,8 +198,6 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._gripper_down_yaw_w: torch.Tensor | None = None
         self._gripper_down_yaw_offset_w: torch.Tensor | None = None
         self._gripper_place_yaw_offset_w: torch.Tensor | None = None
-        self._target_q7: torch.Tensor | None = None
-        self._initial_q7: torch.Tensor | None = None
         self._current_object_idx: int = 0
         self._event: int = 0
         self._events_dt: list[int] = list(_PHASE_DURATIONS_PER_OBJECT) * len(_PICK_ORDER)
@@ -303,21 +301,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
             phase_in_cycle=phase_in_cycle,
         )
 
-        # Calculate joint 7 targets for joint space interpolation
-        if phase_in_cycle >= 3 and self._target_q7 is None:
-            current_q7 = robot.data.joint_pos[:, self._arm_joint_ids[6]].clone()
-            self._initial_q7 = current_q7.clone()
-            
-            if self._gripper_place_yaw_offset_w is None or self._gripper_place_yaw_offset_w.shape[0] != num_envs:
-                noise = torch.randn(num_envs, device=device, dtype=obj_pos_w_ref.dtype)
-                self._gripper_place_yaw_offset_w = torch.clamp(noise * 0.05, min=-0.10, max=0.10)
-                
-            target_obj_yaw = math.pi if obj_name == _FORK_NAME else 0.0
-            place_yaw = target_obj_yaw + _GRASP_YAW_OFFSET + self._gripper_place_yaw_offset_w
-            grasp_yaw = self._gripper_down_yaw_w.to(device=device, dtype=obj_pos_w_ref.dtype)
-            
-            delta_q7 = (place_yaw - grasp_yaw + math.pi) % (2.0 * math.pi) - math.pi
-            self._target_q7 = current_q7 + delta_q7
+        if phase_in_cycle >= 3:
+            self._ensure_place_yaw_offset_w(num_envs, device, obj_pos_w_ref.dtype)
 
         # Calculate local frame offset away from the tip (towards the handle)
         # Fork: tip points to +z, handle points to -z
@@ -337,22 +322,19 @@ class CutleryArrangementStateMachine(StateMachineBase):
         grasp_anchor_w = obj_pos_w_ref.clone()
         grasp_anchor_w[:, :2] += world_offset[:, :2]
 
-        if phase_in_cycle == 0:
-            target_pos_w, gripper_cmd = self._phase_move_above_object(obj_pos_w_ref, num_envs, device)
-        elif phase_in_cycle == 1:
-            target_pos_w, gripper_cmd = self._phase_approach_object(grasp_anchor_w, num_envs, device)
-        elif phase_in_cycle == 2:
-            target_pos_w, gripper_cmd = self._phase_grasp(grasp_anchor_w, num_envs, device)
-        elif phase_in_cycle == 3:
-            target_pos_w, gripper_cmd = self._phase_lift(obj_pos_w_ref, num_envs, device)
-        elif phase_in_cycle == 4:
-            target_pos_w, gripper_cmd = self._phase_move_above_place(place_target_w, num_envs, device)
-        elif phase_in_cycle == 5:
-            target_pos_w, gripper_cmd = self._phase_lower_to_release(place_target_w, num_envs, device)
-        elif phase_in_cycle == 6:
-            target_pos_w, gripper_cmd = self._phase_open_gripper(place_target_w, num_envs, device)
-        else:
-            target_pos_w, gripper_cmd = self._phase_retreat(place_target_w, num_envs, device)
+        phase_handlers = {
+            0: (self._phase_move_above_object, obj_pos_w_ref),
+            1: (self._phase_approach_object, grasp_anchor_w),
+            2: (self._phase_grasp, grasp_anchor_w),
+            3: (self._phase_lift, obj_pos_w_ref),
+            4: (self._phase_move_above_place, place_target_w),
+            5: (self._phase_lower_to_release, place_target_w),
+            6: (self._phase_open_gripper, place_target_w),
+            7: (self._phase_retreat, place_target_w),
+        }
+
+        handler, arg = phase_handlers[phase_in_cycle]
+        target_pos_w, gripper_cmd = handler(arg, num_envs, device)
 
         self._last_target_pos_w = target_pos_w.clone()
         self._last_target_quat_w = target_quat_w.clone()
@@ -430,11 +412,20 @@ class CutleryArrangementStateMachine(StateMachineBase):
         # Position error: Euclidean distance
         pos_error = torch.norm(ee_pos - self._last_target_pos_w, dim=-1)
         
-        # Rotation error: Angle between quaternions in radians (or Joint 7 error in Phase 4)
+        # Rotation error: Angle between quaternions in radians
         phase_in_cycle = self._event % _PHASES_PER_OBJECT
-        if phase_in_cycle == 4 and self._target_q7 is not None:
-            current_q7 = robot.data.joint_pos[:, self._arm_joint_ids[6]]
-            rot_error = (current_q7 - self._target_q7).abs()
+        if phase_in_cycle == 4:
+            # In Phase 4, _last_target_quat_w is interpolating, so it's not the final destination.
+            # We must compute the final place quat to check arrival properly.
+            target_obj_yaw = math.pi if _PICK_ORDER[self._current_object_idx] == _FORK_NAME else 0.0
+            place_yaw = target_obj_yaw + _GRASP_YAW_OFFSET + self._gripper_place_yaw_offset_w
+            roll = torch.full((env.num_envs,), _GRIPPER_DOWN_ROLL_W, device=env.device, dtype=ee_quat.dtype)
+            pitch = torch.full((env.num_envs,), _GRIPPER_DOWN_PITCH_W, device=env.device, dtype=ee_quat.dtype)
+            final_quat_w = quat_from_euler_xyz(roll, pitch, place_yaw)
+            
+            dot_product = torch.sum(ee_quat * final_quat_w, dim=-1).abs()
+            dot_product = torch.clamp(dot_product, 0.0, 1.0)
+            rot_error = 2.0 * torch.acos(dot_product)
         else:
             dot_product = torch.sum(ee_quat * self._last_target_quat_w, dim=-1).abs()
             dot_product = torch.clamp(dot_product, 0.0, 1.0)
@@ -443,7 +434,6 @@ class CutleryArrangementStateMachine(StateMachineBase):
         epsilon_pos = self.EPSILON_POS
         epsilon_rot = self.EPSILON_ROT
         
-        phase_in_cycle = self._event % _PHASES_PER_OBJECT
         if phase_in_cycle == 1:
             # 2.2: Approach down to object
             # Relax position tolerance slightly to 0.045m to handle table contact early and avoid stuck timeouts
@@ -499,37 +489,36 @@ class CutleryArrangementStateMachine(StateMachineBase):
             self._last_advance_with_env = False
             if self._step_count < self._events_dt[self._event]:
                 return
-            self._event += 1
-            self._step_count = 0
-        else:
-            self._last_advance_with_env = True
-            phase_in_cycle = self._event % _PHASES_PER_OBJECT
-            default_duration = self._events_dt[self._event]
-            obj_name = _PICK_ORDER[self._current_object_idx]
-            
-            if phase_in_cycle == 2 or phase_in_cycle == 6:
-                # Phase 2: Close gripper to grasp
-                # Phase 6: Open gripper to release
-                # (Both are purely time-based open-loop durations)
-                if self._step_count < default_duration:
-                    return
-                self._event += 1
-                self._step_count = 0
-            else:
-                # Movement phases: 0, 1, 3, 4, 5, 7
-                arrived = self.check_arrival(env).all()
-                min_steps = max(10, int(_MIN_STEP_SCALE_FACTOR * default_duration))
-                max_steps = int(_MAX_STEP_SCALE_FACTOR * default_duration)
-                
-                # Check if arrived after minimum steps or if we timed out
-                if arrived and self._step_count >= min_steps:
-                    self._event += 1
-                    self._step_count = 0
-                elif self._step_count >= max_steps:
-                    phase_name = _PHASE_NAMES.get(phase_in_cycle, f"Phase {phase_in_cycle}")
-                    self._log_timeout_diagnostics(env, phase_name, max_steps)
-                    self._event += 1
-                    self._step_count = 0
+            self._advance_to_next_event()
+            return
+
+        self._last_advance_with_env = True
+        phase_in_cycle = self._event % _PHASES_PER_OBJECT
+        default_duration = self._events_dt[self._event]
+        
+        # Purely time-based open-loop durations
+        if phase_in_cycle in (2, 6):
+            if self._step_count < default_duration:
+                return
+            self._advance_to_next_event()
+            return
+
+        # Movement phases: 0, 1, 3, 4, 5, 7
+        arrived = self.check_arrival(env).all()
+        min_steps = max(10, int(_MIN_STEP_SCALE_FACTOR * default_duration))
+        max_steps = int(_MAX_STEP_SCALE_FACTOR * default_duration)
+        
+        if arrived and self._step_count >= min_steps:
+            self._advance_to_next_event()
+        elif self._step_count >= max_steps:
+            phase_name = _PHASE_NAMES.get(phase_in_cycle, f"Phase {phase_in_cycle}")
+            self._log_timeout_diagnostics(env, phase_name, max_steps)
+            self._advance_to_next_event()
+
+    def _advance_to_next_event(self) -> None:
+        """Helper to increment the event counter and reset per-object state when transitioning to a new object."""
+        self._event += 1
+        self._step_count = 0
 
         # Post-event transition check
         if self._event >= len(self._events_dt):
@@ -543,8 +532,6 @@ class CutleryArrangementStateMachine(StateMachineBase):
             self._gripper_down_yaw_w = None
             self._gripper_down_yaw_offset_w = None
             self._gripper_place_yaw_offset_w = None
-            self._target_q7 = None
-            self._initial_q7 = None
             self._initial_obj_pos_w = None
             self._initial_obj_quat_w = None
 
@@ -557,8 +544,6 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._gripper_down_yaw_w = None
         self._gripper_down_yaw_offset_w = None
         self._gripper_place_yaw_offset_w = None
-        self._target_q7 = None
-        self._initial_q7 = None
         self._last_target_pos_w = None
         self._last_target_quat_w = None
         self._last_advance_with_env = False
@@ -601,19 +586,6 @@ class CutleryArrangementStateMachine(StateMachineBase):
         joint_pos_target = self._arm_joint_pos(robot) + self._compute_delta_joint_pos(
             pose_delta_root, self._ee_jacobian_root(robot)
         )
-        
-        # Override Joint 7 target in joint space to prevent IK jumps and limits violation
-        phase_in_cycle = self._event % _PHASES_PER_OBJECT
-        if self._target_q7 is not None and phase_in_cycle >= 4:
-            if phase_in_cycle == 4:
-                # Interpolate from initial q7 to target q7
-                denom = max(self._events_dt[self._event] - 1, 1)
-                alpha = min(self._step_count / denom, 1.0)
-                interpolated_q7 = (1.0 - alpha) * self._initial_q7 + alpha * self._target_q7
-                joint_pos_target[:, 6] = interpolated_q7
-            else:
-                # Sustain target q7 during phase 5, 6, 7
-                joint_pos_target[:, 6] = self._target_q7
                 
         joint_pos_target = self._clamp_arm_joint_pos(robot, joint_pos_target)
         return torch.cat([joint_pos_target, gripper_cmd], dim=-1)
@@ -678,11 +650,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
 
         if phase_in_cycle >= 4:
             # Generate a new place noise from normal distribution (std = 2.86 deg / 0.05 rad, clipped at +- 5.72 deg / 0.10 rad)
-            if self._gripper_place_yaw_offset_w is None or self._gripper_place_yaw_offset_w.shape[0] != num_envs:
-                # torch.randn generates standard normal distribution (mean=0, std=1)
-                noise = torch.randn(num_envs, device=device, dtype=dtype)
-                # Scale by standard deviation 0.05 rad (2.86 degrees) and clamp to +- 0.10 rad (5.72 degrees)
-                self._gripper_place_yaw_offset_w = torch.clamp(noise * 0.05, min=-0.10, max=0.10)
+            self._ensure_place_yaw_offset_w(num_envs, device, dtype)
             
             target_obj_yaw = math.pi if obj_name == _FORK_NAME else 0.0
             place_yaw = target_obj_yaw + yaw_offset + self._gripper_place_yaw_offset_w
@@ -706,6 +674,14 @@ class CutleryArrangementStateMachine(StateMachineBase):
         roll = torch.full((num_envs,), _GRIPPER_DOWN_ROLL_W, device=device, dtype=dtype)
         pitch = torch.full((num_envs,), _GRIPPER_DOWN_PITCH_W, device=device, dtype=dtype)
         return quat_from_euler_xyz(roll, pitch, yaw)
+
+    def _ensure_place_yaw_offset_w(self, num_envs: int, device: torch.device, dtype: torch.dtype) -> None:
+        """Ensures that the random yaw offset for placing the object is initialized."""
+        if self._gripper_place_yaw_offset_w is None or self._gripper_place_yaw_offset_w.shape[0] != num_envs:
+            # Generate a new place noise from standard normal distribution (mean=0, std=1)
+            noise = torch.randn(num_envs, device=device, dtype=dtype)
+            # Scale by standard deviation 0.05 rad (2.86 degrees) and clamp to +- 0.10 rad (5.72 degrees)
+            self._gripper_place_yaw_offset_w = torch.clamp(noise * 0.05, min=-0.10, max=0.10)
 
     # ------------------------------------------------------------------
     # Properties
