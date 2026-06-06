@@ -289,11 +289,15 @@ class PyBulletFrankaValidator:
             meshScale=[100, 100, 100],
             visualFrameOrientation=q_align
         )
+        # Check if fork overlaps with the plate (threshold 0.12m) to spawn it above the plate
+        dist_fork_plate = math.sqrt((fork_pos[0] - _PLATE_POS[0])**2 + (fork_pos[1] - _PLATE_POS[1])**2)
+        fork_spawn_z = _PLATE_POS[2] + 0.03 if dist_fork_plate < 0.12 else _FORK_Z
+
         self.objects["fork"] = p.createMultiBody(
             baseMass=0.1,
             baseCollisionShapeIndex=fork_col,
             baseVisualShapeIndex=fork_visual,
-            basePosition=[fork_pos[0], fork_pos[1], _FORK_Z],
+            basePosition=[fork_pos[0], fork_pos[1], fork_spawn_z],
             baseOrientation=fork_quat
         )
 
@@ -311,11 +315,15 @@ class PyBulletFrankaValidator:
             meshScale=[100, 100, 100],
             visualFrameOrientation=q_align
         )
+        # Check if knife overlaps with the plate (threshold 0.12m) to spawn it above the plate
+        dist_knife_plate = math.sqrt((knife_pos[0] - _PLATE_POS[0])**2 + (knife_pos[1] - _PLATE_POS[1])**2)
+        knife_spawn_z = _PLATE_POS[2] + 0.03 if dist_knife_plate < 0.12 else _KNIFE_Z
+
         self.objects["knife"] = p.createMultiBody(
             baseMass=0.1,
             baseCollisionShapeIndex=knife_col,
             baseVisualShapeIndex=knife_visual,
-            basePosition=[knife_pos[0], knife_pos[1], _KNIFE_Z],
+            basePosition=[knife_pos[0], knife_pos[1], knife_spawn_z],
             baseOrientation=knife_quat
         )
         
