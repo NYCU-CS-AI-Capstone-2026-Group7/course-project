@@ -362,10 +362,10 @@ def _on_episode_done(
         import math
         try:
             # 1. Verify Knife Yaw (expected 0.0)
-            k_ok, k_yaw, k_diff_deg = _check_cutlery_yaw_mismatch(env, "knife", 0.0)
+            k_ok, k_yaw, k_diff_deg = _check_cutlery_yaw_mismatch(env, "knife", math.pi)
 
             # 2. Verify Fork Yaw (expected pi)
-            f_ok, f_yaw, f_diff_deg = _check_cutlery_yaw_mismatch(env, "fork", math.pi)
+            f_ok, f_yaw, f_diff_deg = _check_cutlery_yaw_mismatch(env, "fork", 0.0)
 
             if not k_ok or not f_ok:
                 print(f"[INFO] Success check failed due to yaw mismatch:")

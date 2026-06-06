@@ -181,8 +181,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
         int(_MAX_STEP_SCALE_FACTOR * _ph_durations[7])   # Phase 7
     )
     MAX_STEPS: int = len(_PICK_ORDER) * sum(_ph_timeouts) + 100
-    EPSILON_POS: float = 0.03
-    EPSILON_ROT: float = 0.10
+    EPSILON_POS: float = 0.01
+    EPSILON_ROT: float = 0.15
 
     def __init__(self) -> None:
         self._step_count: int = 0
