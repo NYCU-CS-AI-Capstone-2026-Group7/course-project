@@ -551,9 +551,9 @@ def main():
                     # Early termination optimization (only for failed grasp, success is validated after settle)
                     if args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
                         import math
-                        # event == 3 is right after knife lift phase; event == 11 is right after fork lift phase
-                        if (sm._event == 3 or sm._event == 11) and sm._step_count == 150:
-                            target_obj = "knife" if sm._event == 3 else "fork"
+                        # event == 4 is right after knife lift phase; event == 12 is right after fork lift phase
+                        if (sm._event == 4 or sm._event == 12) and sm._step_count == 0:
+                            target_obj = "knife" if sm._event == 4 else "fork"
                             # Get object Z relative to env origin
                             obj_z = env.scene[target_obj].data.root_pos_w[0, 2].item() - env.scene.env_origins[0, 2].item()
                             if obj_z < 0.08: # Normal lifted height is ~0.20+, if < 0.08 it means grasp failed
