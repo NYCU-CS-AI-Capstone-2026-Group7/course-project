@@ -35,12 +35,20 @@ done
 echo "Starting HuggingFace Dataset Auto-Uploader..."
 echo "Polling for changes every 30 seconds..."
 
+# 建立一個全局的臨時快照基底目錄
+SNAPSHOT_BASE_DIR="/tmp/hf_upload_snapshot"
+mkdir -p "$SNAPSHOT_BASE_DIR"
+
+# 用於刪除全局快照目錄的清理鉤子
+trap 'rm -rf "$SNAPSHOT_BASE_DIR"' EXIT
+
 # 進入無窮迴圈每 30 秒輪詢一次
 while true; do
     for suffix in "${TARGETS[@]}"; do
         DIR_NAME="aicapstone_group7_cutlery_v2_replay$suffix"
         DIR_PATH="$BASE_DIR/$DIR_NAME"
         REPO_NAME="$REPO_PREFIX$suffix"
+        SNAPSHOT_DIR="$SNAPSHOT_BASE_DIR/$DIR_NAME"
         
         if [ -d "$DIR_PATH" ]; then
             KEY="${suffix:-main}"
@@ -56,17 +64,29 @@ while true; do
                 echo "--------------------------------------------------------"
                 echo "[$(date)] Update detected in: $DIR_NAME"
                 
-                # 執行您要求的上傳指令
+                echo "[INFO] Creating static directory snapshot using rsync to prevent read/write race condition..."
+                mkdir -p "$SNAPSHOT_DIR"
+                # 使用 rsync 增量複製到臨時目錄，排除上傳期間的檔案變動鎖死
+                rsync -a --delete "$DIR_PATH/" "$SNAPSHOT_DIR/"
+                
+                # 執行上傳指令
                 if [ "$OVERWRITE_REMOTE" = true ] && [ "${IS_FIRST_UPLOAD[$KEY]}" = true ]; then
-                    echo "Running: hf upload $REPO_NAME $DIR_PATH --repo-type dataset --delete '*'"
-                    hf upload "$REPO_NAME" "$DIR_PATH" --repo-type dataset --delete '*'
+                    # 第一次清空並覆蓋時，檔案通常極少，使用普通 hf upload 帶 --delete
+                    echo "Running: hf upload $REPO_NAME $SNAPSHOT_DIR --repo-type dataset --delete '*'"
+                    hf upload "$REPO_NAME" "$SNAPSHOT_DIR" --repo-type dataset --delete '*'
                 else
-                    echo "Running: hf upload $REPO_NAME $DIR_PATH --repo-type dataset"
-                    hf upload "$REPO_NAME" "$DIR_PATH" --repo-type dataset
+                    # 增量上傳或大型上傳，使用 upload-large-folder 避免 504 逾時
+                    echo "Running: hf upload-large-folder $REPO_NAME $SNAPSHOT_DIR --repo-type dataset"
+                    hf upload-large-folder "$REPO_NAME" "$SNAPSHOT_DIR" --repo-type dataset
                 fi
                 
+                UPLOAD_STATUS=$?
+                
+                # 刪除臨時快照以釋放空間
+                rm -rf "$SNAPSHOT_DIR"
+                
                 # 如果上傳成功，才更新紀錄的時間戳
-                if [ $? -eq 0 ]; then
+                if [ $UPLOAD_STATUS -eq 0 ]; then
                     LAST_MOD_TIMES["$KEY"]=$(find "$DIR_PATH" -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1 | cut -d. -f1)
                     IS_FIRST_UPLOAD["$KEY"]=false
                     echo "[$(date)] Successfully uploaded $REPO_NAME"
