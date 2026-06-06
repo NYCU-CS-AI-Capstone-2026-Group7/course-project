@@ -608,15 +608,30 @@ def main():
     finally:
         # Ignore SIGINT (Ctrl+C) during database finalization to prevent database corruption
         signal.signal(signal.SIGINT, signal.SIG_IGN)
-        if args_cli.record and hasattr(env.recorder_manager, "finalize"):
-            print("\n[INFO] Committing database and finalizing videos to disk... Please do NOT interrupt! (Ctrl+C is temporarily disabled)")
-            env.recorder_manager.finalize()
-            print("[INFO] Dataset finalized and committed successfully!")
-        
-        # Restore original SIGINT handler
-        signal.signal(signal.SIGINT, original_sigint_handler)
-        env.close()
-        simulation_app.close()
+        try:
+            if args_cli.record and hasattr(env.recorder_manager, "finalize"):
+                print("\n[INFO] Committing database and finalizing videos to disk... Please do NOT interrupt! (Ctrl+C is temporarily disabled)")
+                try:
+                    env.recorder_manager.finalize()
+                    print("[INFO] Dataset finalized and committed successfully!")
+                except Exception as finalize_err:
+                    print(f"\n[ERROR] Failed to finalize dataset: {finalize_err}")
+                    import traceback
+                    traceback.print_exc()
+        finally:
+            # Restore original SIGINT handler so user can interrupt if cleanup hangs
+            signal.signal(signal.SIGINT, original_sigint_handler)
+            
+            print("[INFO] Closing environment and simulation app...")
+            try:
+                env.close()
+            except Exception as e:
+                print(f"[WARNING] env.close() failed: {e}")
+            
+            try:
+                simulation_app.close()
+            except Exception as e:
+                print(f"[WARNING] simulation_app.close() failed: {e}")
     
     print(success_ID)
 
