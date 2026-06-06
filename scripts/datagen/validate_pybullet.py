@@ -167,7 +167,16 @@ class PyBulletFrankaValidator:
             useFixedBase=True,
             flags=p.URDF_USE_SELF_COLLISION
         )
-        self.ee_index = 8  # panda_hand link index
+        # Dynamically map ee_index (panda_hand) and gripper_center_index (panda_grasptarget)
+        self.ee_index = 8
+        self.gripper_center_index = 8
+        for i in range(p.getNumJoints(self.robot_id)):
+            joint_info = p.getJointInfo(self.robot_id, i)
+            link_name = joint_info[12].decode('utf-8')
+            if link_name == "panda_hand":
+                self.ee_index = i
+            elif link_name == "panda_grasptarget":
+                self.gripper_center_index = i
         
         # Move joints to home rest pose
         for idx, angle in enumerate(_FRANKA_REST_POSE):
@@ -462,11 +471,13 @@ class PyBulletFrankaValidator:
         segments = [
             (w_start, w_hover, 40, False, obj_yaw, obj_yaw),
             (w_hover, w_grasp, 30, False, obj_yaw, obj_yaw),
-            (w_grasp, w_grasp, 10, True, obj_yaw, obj_yaw),
+            (w_grasp, w_grasp, 15, False, obj_yaw, obj_yaw),  # Wait for arm to fully settle BEFORE fingers close
+            (w_grasp, w_grasp, 15, True, obj_yaw, obj_yaw),   # Close fingers and create constraint
             (w_grasp, w_lift, 30, True, obj_yaw, obj_yaw),
             (w_lift, w_transit, 40, True, obj_yaw, target_yaw),
             (w_transit, w_place, 30, True, target_yaw, target_yaw),
-            (w_place, w_place, 10, False, target_yaw, target_yaw),
+            (w_place, w_place, 15, True, target_yaw, target_yaw),  # Wait for arm to settle at place pos
+            (w_place, w_place, 15, False, target_yaw, target_yaw), # Open fingers and release constraint
             (w_place, w_retreat, 30, False, target_yaw, target_yaw)
         ]
         
@@ -506,8 +517,8 @@ class PyBulletFrankaValidator:
                             jointIndex=j_idx,
                             controlMode=p.POSITION_CONTROL,
                             targetPosition=clamped_angle,
-                            force=200.0,
-                            maxVelocity=2.0
+                            force=500.0,
+                            maxVelocity=5.0
                         )
                     # Control finger joints physically
                     finger_target = 0.015 if has_grasped else 0.04
@@ -519,7 +530,7 @@ class PyBulletFrankaValidator:
                     for _ in range(physics_steps):
                         p.stepSimulation()
                         if self.use_gui:
-                            time.sleep(self.sleep_time / physics_steps)
+                            time.sleep(1.0 / 240.0) # Match PyBullet's internal 240Hz step for 1x real-time
                 else:
                     # Apply joint angles kinematically (clamping to joint limits to match Isaac Sim)
                     for j_idx, angle in enumerate(joint_angles[:7]):
@@ -534,8 +545,10 @@ class PyBulletFrankaValidator:
                     
                 if has_grasped:
                     if grasp_constraint_id is None:
-                        # Grab event! Attach the object at its current relative transform
-                        ee_state = p.getLinkState(self.robot_id, self.ee_index)
+                        # Grab event! Attach the object at its actual physical relative transform.
+                        # We use pure segments to ensure the arm has physically settled BEFORE closing the fingers.
+                        # We attach the constraint to the gripper center (panda_grasptarget) to minimize lever arm error.
+                        ee_state = p.getLinkState(self.robot_id, self.gripper_center_index)
                         ee_pos, ee_quat = ee_state[4], ee_state[5]
                         obj_pos_now, obj_quat_now = p.getBasePositionAndOrientation(obj_body_id)
                         
@@ -551,7 +564,7 @@ class PyBulletFrankaValidator:
                         
                         grasp_constraint_id = p.createConstraint(
                             parentBodyUniqueId=self.robot_id,
-                            parentLinkIndex=self.ee_index,
+                            parentLinkIndex=self.gripper_center_index,
                             childBodyUniqueId=obj_body_id,
                             childLinkIndex=-1,
                             jointType=p.JOINT_FIXED,
@@ -565,7 +578,7 @@ class PyBulletFrankaValidator:
                     if not self.arm_physics:
                         # Manually teleport object to match gripper exactly (kinematic tracking)
                         # This prevents springy constraints from twisting/tilting under high IK step forces.
-                        ee_state = p.getLinkState(self.robot_id, self.ee_index)
+                        ee_state = p.getLinkState(self.robot_id, self.gripper_center_index)
                         ee_pos, ee_quat = ee_state[4], ee_state[5]
                         target_obj_pos, target_obj_quat = p.multiplyTransforms(ee_pos, ee_quat, rel_pos, rel_quat)
                         
