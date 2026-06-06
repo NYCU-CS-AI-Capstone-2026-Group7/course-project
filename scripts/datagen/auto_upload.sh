@@ -44,11 +44,10 @@ while true; do
             if [ "$CURRENT_MOD" -gt "${LAST_MOD_TIMES[$suffix]:-0}" ]; then
                 echo "--------------------------------------------------------"
                 echo "[$(date)] Update detected in: $DIR_NAME"
-                echo "Running: huggingface-cli upload $REPO_NAME $DIR_PATH --repo-type dataset"
+                echo "Running: hf upload $REPO_NAME $DIR_PATH --repo-type dataset"
                 
                 # 執行您要求的上傳指令
-                # 注意：如果您使用的指令真的是 `hf upload` (設定的 alias)，請將下方替換為 `hf upload`
-                huggingface-cli upload "$REPO_NAME" "$DIR_PATH" --repo-type dataset
+                hf upload "$REPO_NAME" "$DIR_PATH" --repo-type dataset
                 
                 # 如果上傳成功，才更新紀錄的時間戳
                 if [ $? -eq 0 ]; then
