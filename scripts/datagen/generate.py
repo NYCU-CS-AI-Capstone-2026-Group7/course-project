@@ -279,62 +279,7 @@ def _any_object_fell(env, object_names, z_threshold: float) -> bool:
     return False
 
 
-def _get_yaw(quat_tensor: torch.Tensor) -> float:
-    """Extract yaw from a single quaternion (w, x, y, z) tensor."""
-    import math
-    w, x, y, z = quat_tensor[0].item(), quat_tensor[1].item(), quat_tensor[2].item(), quat_tensor[3].item()
-    siny_cosp = 2.0 * (w * z + x * y)
-    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
-    return math.atan2(siny_cosp, cosy_cosp)
 
-
-def _get_yaw_diff_deg(actual_yaw: float, expected_yaw: float) -> float:
-    """Calculate the absolute difference in degrees between actual_yaw and expected_yaw."""
-    import math
-    diff = (actual_yaw - expected_yaw + math.pi) % (2.0 * math.pi) - math.pi
-    return abs(math.degrees(diff))
-
-
-def _check_cutlery_yaw_mismatch(env, object_name: str, expected_yaw: float, max_diff_deg: float = 15.0) -> tuple[bool, float, float]:
-    """Check if the cutlery object's yaw is within the accepted range. Returns (is_ok, actual_yaw, diff_deg)."""
-    quat = env.scene[object_name].data.root_quat_w[0]
-    actual_yaw = _get_yaw(quat)
-    diff_deg = _get_yaw_diff_deg(actual_yaw, expected_yaw)
-    return diff_deg <= max_diff_deg, actual_yaw, diff_deg
-
-
-def _check_cutlery_early_abort(env, sm) -> None:
-    """Check and apply early termination conditions for the cutlery arrangement task."""
-    import math
-    if sm._step_count != 0:
-        return
-
-    # event == 4 is right after knife lift phase; event == 12 is right after fork lift phase
-    if sm._event in (4, 12):
-        target_obj = "knife" if sm._event == 4 else "fork"
-        # Get object Z relative to env origin
-        obj_z = env.scene[target_obj].data.root_pos_w[0, 2].item() - env.scene.env_origins[0, 2].item()
-        if obj_z < 0.08:  # Normal lifted height is ~0.20+, if < 0.08 it means grasp failed
-            print(f"[INFO] Early abort: Failed to grasp {target_obj} (z={obj_z:.3f} < 0.08).")
-            sm._episode_done = True
-        return
-
-    # 1. Knife placed (event 8, step 0): check knife yaw
-    if sm._event == 8:
-        k_ok, k_yaw, k_diff_deg = _check_cutlery_yaw_mismatch(env, "knife", math.pi)
-        if not k_ok:
-            print(f"[INFO] Early abort: Knife yaw mismatch (yaw={math.degrees(k_yaw):.1f}° | diff={k_diff_deg:.1f}° > 15.0°).")
-            sm._episode_done = True
-        return
-
-    # 2. Fork placed (event 16, step 0): check fork yaw
-    if sm._event == 16:
-        f_ok, f_yaw, f_diff_deg = _check_cutlery_yaw_mismatch(env, "fork", 0)
-        if not f_ok:
-            print(f"[INFO] Early abort: Fork yaw mismatch (yaw={math.degrees(f_yaw):.1f}° | diff={f_diff_deg:.1f}° > 15.0°).")
-            sm._event = 15  # Set back to 15 so we skip the 300-step settle and end immediately
-            sm._episode_done = True
-        return
 
 
 def _on_episode_done(
@@ -358,23 +303,7 @@ def _on_episode_done(
         print("Success check failed:", e)
         success = False
 
-    if success and args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
-        import math
-        try:
-            # 1. Verify Knife Yaw (expected 0.0)
-            k_ok, k_yaw, k_diff_deg = _check_cutlery_yaw_mismatch(env, "knife", math.pi)
 
-            # 2. Verify Fork Yaw (expected pi)
-            f_ok, f_yaw, f_diff_deg = _check_cutlery_yaw_mismatch(env, "fork", 0.0)
-
-            if not k_ok or not f_ok:
-                print(f"[INFO] Success check failed due to yaw mismatch:")
-                print(f"  - Knife yaw: {math.degrees(k_yaw):.1f}° (diff: {k_diff_deg:.1f}°) " + ("OK" if k_ok else "FAIL (>15°)"))
-                print(f"  - Fork yaw: {math.degrees(f_yaw):.1f}° (diff: {f_diff_deg:.1f}°) " + ("OK" if f_ok else "FAIL (>15°)"))
-                success = False
-        except Exception as e:
-            print("Yaw verification failed during success check:", e)
-            success = False
 
     print("Episode success!" if success else "Episode failed!")
 
@@ -587,8 +516,8 @@ def main():
                     env.step(actions)
                     sm.advance(env)
 
-                    if args_cli.task == "HCIS-CutleryArrangement-SingleArm-v0":
-                        _check_cutlery_early_abort(env, sm)
+                    if hasattr(sm, "check_early_abort"):
+                        sm.check_early_abort(env)
 
                     if fall_check_object_names and _any_object_fell(env, fall_check_object_names, _FALL_THRESHOLD_Z):
                         print("[INFO] Task object fell off the table; aborting this episode and skipping to next.")
