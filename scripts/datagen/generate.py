@@ -97,9 +97,19 @@ try:
             self._lerobot_dataset.clear_episode_buffer()
     LeRobotDatasetHandler.clear = patched_clear
     
-    # 3. Enable parallel video encoding during flush()
+    # 3. Enable parallel video encoding during flush() with sequential fallback
     def patched_flush(self):
-        self._lerobot_dataset.save_episode(parallel_encoding=True)
+        try:
+            self._lerobot_dataset.save_episode(parallel_encoding=True)
+        except Exception as e:
+            print(f"\n[WARNING] Parallel video encoding failed: {e}")
+            print("[INFO] Falling back to sequential video encoding (parallel_encoding=False) for safety.")
+            try:
+                self._lerobot_dataset.save_episode(parallel_encoding=False)
+                print("[INFO] Successfully saved episode using sequential video encoding.")
+            except Exception as fallback_err:
+                print(f"[ERROR] Sequential video encoding fallback also failed: {fallback_err}")
+                raise fallback_err
     LeRobotDatasetHandler.flush = patched_flush
     
     # 4. Patch add_frame to override task string with current pose index
