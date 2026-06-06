@@ -197,6 +197,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._initial_ee_pos_w: torch.Tensor | None = None
         self._gripper_down_yaw_w: torch.Tensor | None = None
         self._gripper_down_yaw_offset_w: torch.Tensor | None = None
+        self._gripper_place_yaw_offset_w: torch.Tensor | None = None
         self._current_object_idx: int = 0
         self._event: int = 0
         self._events_dt: list[int] = list(_PHASE_DURATIONS_PER_OBJECT) * len(_PICK_ORDER)
@@ -518,6 +519,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
             self._initial_ee_pos_w = None
             self._gripper_down_yaw_w = None
             self._gripper_down_yaw_offset_w = None
+            self._gripper_place_yaw_offset_w = None
             self._initial_obj_pos_w = None
             self._initial_obj_quat_w = None
 
@@ -529,6 +531,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._initial_ee_pos_w = None
         self._gripper_down_yaw_w = None
         self._gripper_down_yaw_offset_w = None
+        self._gripper_place_yaw_offset_w = None
         self._last_target_pos_w = None
         self._last_target_quat_w = None
         self._last_advance_with_env = False
@@ -632,21 +635,28 @@ class CutleryArrangementStateMachine(StateMachineBase):
                 base_yaw + yaw_offset + self._gripper_down_yaw_offset_w
             ).clone()
 
-        if phase_in_cycle == 4:
-            # Gradually interpolate yaw from grasp yaw to place yaw during phase 4
-            target_obj_yaw = math.pi if obj_name == _FORK_NAME else 0.0
-            place_yaw = target_obj_yaw + yaw_offset + self._gripper_down_yaw_offset_w
-            grasp_yaw = self._gripper_down_yaw_w.to(device=device, dtype=dtype)
+        if phase_in_cycle >= 4:
+            # Generate a new place noise from normal distribution (std = 2.86 deg / 0.05 rad, clipped at +- 5.72 deg / 0.10 rad)
+            if self._gripper_place_yaw_offset_w is None or self._gripper_place_yaw_offset_w.shape[0] != num_envs:
+                # torch.randn generates standard normal distribution (mean=0, std=1)
+                noise = torch.randn(num_envs, device=device, dtype=dtype)
+                # Scale by standard deviation 0.05 rad (2.86 degrees) and clamp to +- 0.10 rad (5.72 degrees)
+                self._gripper_place_yaw_offset_w = torch.clamp(noise * 0.05, min=-0.10, max=0.10)
             
-            denom = max(self._events_dt[self._event] - 1, 1)
-            alpha = min(self._step_count / denom, 1.0)
-            
-            diff = (place_yaw - grasp_yaw + math.pi) % (2.0 * math.pi) - math.pi
-            yaw = grasp_yaw + alpha * diff
-        elif phase_in_cycle > 4:
             target_obj_yaw = math.pi if obj_name == _FORK_NAME else 0.0
-            yaw = torch.full((num_envs,), target_obj_yaw + yaw_offset, device=device, dtype=dtype)
-            yaw += self._gripper_down_yaw_offset_w
+            place_yaw = target_obj_yaw + yaw_offset + self._gripper_place_yaw_offset_w
+            
+            if phase_in_cycle == 4:
+                # Gradually interpolate yaw from grasp yaw to place yaw during phase 4
+                grasp_yaw = self._gripper_down_yaw_w.to(device=device, dtype=dtype)
+                
+                denom = max(self._events_dt[self._event] - 1, 1)
+                alpha = min(self._step_count / denom, 1.0)
+                
+                diff = (place_yaw - grasp_yaw + math.pi) % (2.0 * math.pi) - math.pi
+                yaw = grasp_yaw + alpha * diff
+            else:
+                yaw = place_yaw
         else:
             yaw = self._gripper_down_yaw_w.to(device=device, dtype=dtype)
 
