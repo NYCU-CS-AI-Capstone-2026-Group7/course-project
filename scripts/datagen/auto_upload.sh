@@ -14,8 +14,9 @@ if [ "$1" == "--overwrite" ]; then
     echo "[INFO] Overwrite remote flag is set. The first upload will clear remote repo."
 fi
 
-# 用關聯陣列儲存最後一次的修改時間與是否為首次上傳的標記
+# 用關聯陣列儲存最後一次的修改時間、最後上傳時間與是否為首次上傳的標記
 declare -A LAST_MOD_TIMES
+declare -A LAST_UPLOAD_TIMES
 declare -A IS_FIRST_UPLOAD
 
 # 初始抓取每個資料夾目前的最後修改時間
@@ -29,6 +30,7 @@ for suffix in "${TARGETS[@]}"; do
     else
         LAST_MOD_TIMES["$KEY"]=0
     fi
+    LAST_UPLOAD_TIMES["$KEY"]=0
     IS_FIRST_UPLOAD["$KEY"]=true
 done
 
@@ -61,8 +63,18 @@ while true; do
             
             # 若當前最新檔案的時間 大於 上次紀錄的時間
             if [ "$CURRENT_MOD" -gt "${LAST_MOD_TIMES[$KEY]:-0}" ]; then
+                NOW=$(date +%s)
+                ELAPSED=$((NOW - ${LAST_UPLOAD_TIMES[$KEY]:-0}))
+                MIN_UPLOAD_INTERVAL=600 # 最小上傳時間間隔：10 分鐘 (秒)
+                
+                if [ "$ELAPSED" -lt "$MIN_UPLOAD_INTERVAL" ]; then
+                    WAIT_MORE=$((MIN_UPLOAD_INTERVAL - ELAPSED))
+                    echo "[$(date)] [THROTTLE] Changes detected in $DIR_NAME, but the minimum upload interval has not elapsed (last upload was ${ELAPSED}s ago, limit is ${MIN_UPLOAD_INTERVAL}s). Postponing upload (retry in ${WAIT_MORE}s)..."
+                    continue
+                fi
+                
                 echo "--------------------------------------------------------"
-                echo "[$(date)] Update detected in: $DIR_NAME"
+                echo "[$(date)] Update detected and minimum interval cleared: $DIR_NAME (last upload was ${ELAPSED}s ago)"
                 
                 echo "[INFO] Creating static directory snapshot using rsync to prevent read/write race condition..."
                 mkdir -p "$SNAPSHOT_DIR"
@@ -88,6 +100,7 @@ while true; do
                 # 如果上傳成功，才更新紀錄的時間戳
                 if [ $UPLOAD_STATUS -eq 0 ]; then
                     LAST_MOD_TIMES["$KEY"]=$(find "$DIR_PATH" -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1 | cut -d. -f1)
+                    LAST_UPLOAD_TIMES["$KEY"]=$(date +%s)
                     IS_FIRST_UPLOAD["$KEY"]=false
                     echo "[$(date)] Successfully uploaded $REPO_NAME"
                 else
