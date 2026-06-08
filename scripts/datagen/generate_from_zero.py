@@ -119,6 +119,31 @@ def main():
         metavar=("TOP", "RIGHT", "BOTTOM", "LEFT"),
         help="Table inner margin for spawn area: Top Right Bottom Left in meters (default: 0.12 0.12 0.15 0.12).",
     )
+    parser.add_argument(
+        "--yaw_dist",
+        type=str,
+        choices=["uniform", "normal"],
+        default="uniform",
+        help="Yaw distribution type: uniform or normal (default: uniform).",
+    )
+    parser.add_argument(
+        "--yaw_std",
+        type=float,
+        default=15.0,
+        help="Standard deviation for normal yaw distribution in degrees (default: 15.0).",
+    )
+    parser.add_argument(
+        "--fork_mean_yaw",
+        type=float,
+        default=180.0,
+        help="Mean yaw for fork in degrees (default: 180.0, pointing away from arm).",
+    )
+    parser.add_argument(
+        "--knife_mean_yaw",
+        type=float,
+        default=0.0,
+        help="Mean yaw for knife in degrees (default: 0.0, pointing away from arm).",
+    )
     args = parser.parse_args()
 
     output_path = Path(args.output)
@@ -151,7 +176,11 @@ def main():
         self_collision_margin=args.self_collision_margin,
         robot_obj_collision_margin=args.robot_obj_collision_margin,
         obj_obj_collision_margin=args.obj_obj_collision_margin,
-        spawn_margin=tuple(args.spawn_margin)
+        spawn_margin=tuple(args.spawn_margin),
+        yaw_dist=args.yaw_dist,
+        yaw_std=args.yaw_std,
+        fork_mean_yaw=args.fork_mean_yaw,
+        knife_mean_yaw=args.knife_mean_yaw,
     )
 
     episodes = []

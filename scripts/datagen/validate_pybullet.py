@@ -118,7 +118,7 @@ def normalize_angle(angle: float) -> float:
 class PyBulletFrankaValidator:
     """Validator using PyBullet physics engine for lightweight CPU simulations."""
 
-    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0, allow_plate_collision=False, arm_physics=False, self_collision_margin=-0.01, robot_obj_collision_margin=0.005, obj_obj_collision_margin=0.005, spawn_margin=(0.12, 0.12, 0.15, 0.12)):
+    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0, allow_plate_collision=False, arm_physics=False, self_collision_margin=-0.01, robot_obj_collision_margin=0.005, obj_obj_collision_margin=0.005, spawn_margin=(0.12, 0.12, 0.15, 0.12), yaw_dist="uniform", yaw_std=15.0, fork_mean_yaw=180.0, knife_mean_yaw=0.0):
         self.use_gui = use_gui
         self.verbose = verbose
         self.sleep_time = 1.0 / fps if fps > 0 else 0.0
@@ -127,6 +127,10 @@ class PyBulletFrankaValidator:
         self.robot_obj_collision_margin = robot_obj_collision_margin
         self.obj_obj_collision_margin = obj_obj_collision_margin
         self.spawn_margin = spawn_margin
+        self.yaw_dist = yaw_dist
+        self.yaw_std = yaw_std
+        self.fork_mean_yaw = fork_mean_yaw
+        self.knife_mean_yaw = knife_mean_yaw
         
         # Calculate dynamic cutlery spawn area based on spawn_margin
         self.table_min_x = _TABLE_CENTER_X - (_TABLE_LENGTH / 2)
@@ -696,10 +700,17 @@ class PyBulletFrankaValidator:
             if dist >= self.min_dist:
                 break
 
-        f_yaw = random.uniform(-math.pi, math.pi)
-        f_quat = euler_xyz_to_quat_wxyz(0, 0, f_yaw)
+        if self.yaw_dist == "normal":
+            std_rad = math.radians(self.yaw_std)
+            f_mean_rad = math.radians(self.fork_mean_yaw)
+            k_mean_rad = math.radians(self.knife_mean_yaw)
+            f_yaw = normalize_angle(random.normalvariate(f_mean_rad, std_rad))
+            k_yaw = normalize_angle(random.normalvariate(k_mean_rad, std_rad))
+        else:
+            f_yaw = random.uniform(-math.pi, math.pi)
+            k_yaw = random.uniform(-math.pi, math.pi)
         
-        k_yaw = random.uniform(-math.pi, math.pi)
+        f_quat = euler_xyz_to_quat_wxyz(0, 0, f_yaw)
         k_quat = euler_xyz_to_quat_wxyz(0, 0, k_yaw)
         
         fork_pos = [f_x, f_y, FORK_Z]
@@ -780,6 +791,31 @@ def main():
         metavar=("TOP", "RIGHT", "BOTTOM", "LEFT"),
         help="Table inner margin for spawn area: Top Right Bottom Left in meters (default: 0.12 0.12 0.15 0.12).",
     )
+    parser.add_argument(
+        "--yaw_dist",
+        type=str,
+        choices=["uniform", "normal"],
+        default="uniform",
+        help="Yaw distribution type: uniform or normal (default: uniform).",
+    )
+    parser.add_argument(
+        "--yaw_std",
+        type=float,
+        default=15.0,
+        help="Standard deviation for normal yaw distribution in degrees (default: 15.0).",
+    )
+    parser.add_argument(
+        "--fork_mean_yaw",
+        type=float,
+        default=180.0,
+        help="Mean yaw for fork in degrees (default: 180.0, pointing away from arm).",
+    )
+    parser.add_argument(
+        "--knife_mean_yaw",
+        type=float,
+        default=0.0,
+        help="Mean yaw for knife in degrees (default: 0.0, pointing away from arm).",
+    )
     args = parser.parse_args()
     
     validator = PyBulletFrankaValidator(
@@ -793,7 +829,11 @@ def main():
         self_collision_margin=args.self_collision_margin,
         robot_obj_collision_margin=args.robot_obj_collision_margin,
         obj_obj_collision_margin=args.obj_obj_collision_margin,
-        spawn_margin=tuple(args.spawn_margin)
+        spawn_margin=tuple(args.spawn_margin),
+        yaw_dist=args.yaw_dist,
+        yaw_std=args.yaw_std,
+        fork_mean_yaw=args.fork_mean_yaw,
+        knife_mean_yaw=args.knife_mean_yaw,
     )
     validator.fix_knife_yaw = args.fix_knife_yaw
     validator.fix_fork_yaw = args.fix_fork_yaw
