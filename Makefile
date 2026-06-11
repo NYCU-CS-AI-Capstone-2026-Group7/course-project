@@ -142,6 +142,7 @@ launch-isaaclab-glowsai-l40s: build-isaaclab
 	docker run --rm -it \
 		--name $(CONTAINER_NAME)-glowsai-l40s \
 		--gpus '"device=0"' \
+		--device /dev/dri/card0:/dev/dri/card0 \
 		--net=host \
 		--ipc=host \
 		--ulimit memlock=-1 \
@@ -153,7 +154,6 @@ launch-isaaclab-glowsai-l40s: build-isaaclab
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v /opt/VirtualGL:/opt/VirtualGL:ro \
 		-v /usr/share/vulkan/icd.d:/usr/share/vulkan/icd.d:ro \
-		-v /etc/vulkan/icd.d:/etc/vulkan/icd.d:ro \
 		-e DISPLAY=:1 \
 		-e USE_VNC=1 \
 		-e VGL_DISPLAY=egl0 \

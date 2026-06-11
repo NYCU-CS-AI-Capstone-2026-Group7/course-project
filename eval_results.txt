@@ -1,0 +1,1410 @@
+[INFO][AppLauncher]: Using device: cuda
+[INFO][AppLauncher]: Loading experience file: /workspace/aicapstone/dependencies/IsaacLab/apps/isaaclab.python.headless.rendering.kit
+Loading user config located at: '/usr/local/lib/python3.11/dist-packages/isaacsim/kit/data/Kit/Isaac-Sim/5.1/user.config.json'
+[Info] [carb] Logging to file: /usr/local/lib/python3.11/dist-packages/isaacsim/kit/logs/Kit/Isaac-Sim/5.1/kit_20260611_052619.log
+2026-06-11T05:26:19Z [145ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-06-11T05:26:19Z [145ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-06-11T05:26:19Z [161ms] [Warning] [omni.platforminfo.plugin] failed to open the default display.  Can't verify X Server version.
+
+|---------------------------------------------------------------------------------------------|
+| Driver Version: 580.126.09    | Graphics API: Vulkan
+|=============================================================================================|
+| GPU | Name                             | Active | LDA | GPU Memory | Vendor-ID | LUID       |
+|     |                                  |        |     |            | Device-ID | UUID       |
+|     |                                  |        |     |            | Bus-ID    |            |
+|---------------------------------------------------------------------------------------------|
+| 0   | NVIDIA L40S                      | Yes: 0 |     | 46068   MB | 10de      | 0          |
+|     |                                  |        |     |            | 26b9      | 5956e1a8.. |
+|     |                                  |        |     |            | 1         |            |
+|=============================================================================================|
+| OS: 22.04.5 LTS (Jammy Jellyfish) ubuntu, Version: 22.04.5, Kernel: 6.8.0-49-generic
+| Processor: INTEL(R) XEON(R) PLATINUM 8558
+| Cores: 28 | Logical Cores: 28
+|---------------------------------------------------------------------------------------------|
+| Total Memory (MB): 257735 | Free Memory: 253430
+| Total Page/Swap (MB): 4095 | Free Page/Swap: 0
+|---------------------------------------------------------------------------------------------|
+cat: '/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor': No such file or directory
+2026-06-11T05:26:21Z [2,091ms] [Warning] [gpu.foundation.plugin] ECC is enabled on physical device 0
+2026-06-11T05:26:22Z [2,782ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-06-11T05:26:22Z [2,782ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-06-11T05:26:22Z [2,799ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-06-11T05:26:22Z [2,799ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-06-11T05:26:22Z [2,810ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-06-11T05:26:22Z [2,810ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-06-11T05:26:22Z [2,817ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-06-11T05:26:22Z [2,817ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-06-11T05:26:22Z [2,819ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-06-11T05:26:22Z [2,819ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-06-11T05:26:22Z [2,820ms] [Warning] [carb.windowing-glfw.plugin] GLFW initialization failed.
+2026-06-11T05:26:22Z [2,820ms] [Warning] [carb] Failed to startup plugin carb.windowing-glfw.plugin (interfaces: [carb::windowing::IGLContext v1.0],[carb::windowing::IWindowing v1.5]) (impl: carb.windowing-glfw.plugin)
+2026-06-11T05:26:22Z [3,012ms] [Warning] [omni.log] Source: omni.hydra was already registered.
+2026-06-11T05:26:22Z [3,307ms] [Warning] [carb] Acquiring non optional plugin interface which is not listed as dependency: [omni::physx::IPhysxBenchmarks v1.0] (plugin: <default plugin>), by client: omni.physics.physx.plugin. Add it to CARB_PLUGIN_IMPL_DEPS() macro of a client.
+2026-06-11T05:26:22Z [3,322ms] [Warning] [omni.isaac.dynamic_control] omni.isaac.dynamic_control is deprecated as of Isaac Sim 4.5. No action is needed from end-users.
+2026-06-11T05:26:25Z [5,647ms] [Warning] [pxr.Semantics] pxr.Semantics is deprecated - please use Semantics instead
+2026-06-11T05:26:25Z [5,750ms] [Warning] [omni.graph.core.plugin] Found duplicate of category 'Replicator' - was 'Annotators', adding 'Fabric Reader'
+2026-06-11T05:26:25Z [5,750ms] [Warning] [omni.graph.core.plugin] Category 'Replicator' not accepted on node type 'omni.replicator.core.FabricReader' in extension 'omni.replicator.core'
+2026-06-11T05:26:25Z [5,751ms] [Warning] [omni.replicator.core.scripts.extension] No material configuration file, adding configuration to material settings directly.
+2026-06-11T05:26:26Z [7,230ms] [Warning] [rtx.neuraylib.plugin] [LINK:PLUGIN]   0.0   LINK   plug warn : Loading /usr/local/lib/python3.11/dist-packages/isaacsim/extscache/omni.iray.libs-0.0.0+69cbf6ad.lx64.r/bin/iray/nvcuvid_video_decoder.so: libnvcuvid.so.1: cannot open shared object file: No such file or directory
+2026-06-11T05:26:26Z [7,230ms] [Warning] [rtx.neuraylib.plugin] [LINK:PLUGIN]   0.0   LINK   plug warn : Loading .\nt-x86-64\lib\nvcuvid_video_decoder.so: .\nt-x86-64\lib\nvcuvid_video_decoder.so: cannot open shared object file: No such file or directory
+2026-06-11T05:26:26Z [7,230ms] [Warning] [rtx.neuraylib.plugin] Failed to load nvcuvid h264 decoder plugin. Iray Bridge h264 support will not be available.
+2026-06-11T05:26:26Z [7,432ms] [Warning] [carb.graphics-vulkan.plugin] Trying to initialize NGX without vkGetInstanceProcAddr and vkGetDeviceProcAddr pointer-to-functions.
+2026-06-11T05:26:26Z [7,432ms] [Error] [carb.graphics-vulkan.plugin] Could not get NGX parameters block because NGX isn't enabled.
+2026-06-11T05:26:26Z [7,432ms] [Error] [carb.graphics-vulkan.plugin] Failed to create NGX context.
+2026-06-11T05:26:26Z [7,432ms] [Warning] [carb.scenerenderer-rtx.plugin] Failed to create NGX context.
+2026-06-11T05:26:28Z [9,199ms] [Warning] [omni.fabric.plugin] Warning: attribute viewportHandle not found for bucket id 7
+
+[INFO]: Parsing configuration from: _aicapstone_external_task_c967a569071049d0a3d6eb120d6d3fe8:CutleryArrangementEnvCfg
+
+[36m======================================================================================[0m
+[36m[1m[INFO][IsaacLab]: Logging to file: /tmp/isaaclab/logs/isaaclab_2026-06-11_05-26-32.log[0m
+[36m======================================================================================[0m
+
+[33m05:26:32 [simulation_context.py] WARNING: The `enable_external_forces_every_iteration` parameter in the PhysxCfg is set to False. If you are experiencing noisy velocities, consider enabling this flag. You may need to slightly increase the number of velocity iterations (setting it to 1 or 2 rather than 0), together with this flag, to improve the accuracy of velocity updates.[0m
+[INFO]: Base environment:
+	Environment device    : cuda:0
+	Environment seed      : 1781155592
+	Physics step-size     : 0.016666666666666666
+	Rendering step-size   : 0.016666666666666666
+	Environment step-size : 0.016666666666666666
+[33m05:26:33 [prims.py] WARNING: Could not perform 'modify_mass_properties' on any prims under: '/World/envs/env_0/Scene/plate'. This might be because of the following reasons:
+	(1) The desired attribute does not exist on any of the prims.
+	(2) The desired attribute exists on an instanced prim.
+		Discovered list of instanced prim paths: [][0m
+[33m05:26:33 [prims.py] WARNING: Could not perform 'modify_mass_properties' on any prims under: '/World/envs/env_0/Scene/knife'. This might be because of the following reasons:
+	(1) The desired attribute does not exist on any of the prims.
+	(2) The desired attribute exists on an instanced prim.
+		Discovered list of instanced prim paths: [][0m
+[33m05:26:34 [prims.py] WARNING: Could not perform 'modify_mass_properties' on any prims under: '/World/envs/env_0/Scene/fork'. This might be because of the following reasons:
+	(1) The desired attribute does not exist on any of the prims.
+	(2) The desired attribute exists on an instanced prim.
+		Discovered list of instanced prim paths: [][0m
+[INFO]: Time taken for scene creation : 1.650223 seconds
+[INFO]: Scene manager:  <class InteractiveScene>
+	Number of environments: 1
+	Environment spacing   : 8.0
+	Source prim name      : /World/envs/env_0
+	Global prim paths     : []
+	Replicate physics     : True
+[INFO]: Starting the simulation. This may take a few seconds. Please wait...
+[INFO]: Time taken for simulation start : 1.915724 seconds
+[INFO] Command Manager:  <CommandManager> contains 0 active terms.
++------------------------+
+|  Active Command Terms  |
++--------+-------+-------+
+| Index  | Name  |  Type |
++--------+-------+-------+
++--------+-------+-------+
+
+[INFO] Event Manager:  <EventManager> contains 1 active terms.
++-------------------------------------+
+| Active Event Terms in Mode: 'reset' |
++---------+---------------------------+
+|  Index  | Name                      |
++---------+---------------------------+
+|    0    | reset_all                 |
+|    1    | domain_randomize_0        |
+|    2    | domain_randomize_1        |
++---------+---------------------------+
+
+[INFO] Recorder Manager:  <RecorderManager> contains 0 active terms.
++---------------------+
+| Active Recorder Terms |
++-----------+---------+
+|   Index   | Name    |
++-----------+---------+
++-----------+---------+
+
+[INFO] Action Manager:  <ActionManager> contains 2 active terms.
++------------------------------------+
+|   Active Action Terms (shape: 8)   |
++-------+----------------+-----------+
+| Index | Name           | Dimension |
++-------+----------------+-----------+
+|   0   | arm_action     |         7 |
+|   1   | gripper_action |         1 |
++-------+----------------+-----------+
+
+[INFO] Observation Manager: <ObservationManager> contains 1 groups.
++-----------------------------------------------+
+|  Active Observation Terms in Group: 'policy'  |
++--------+--------------------+-----------------+
+| Index  | Name               |      Shape      |
++--------+--------------------+-----------------+
+|   0    | joint_pos          |       (9,)      |
+|   1    | joint_vel          |       (9,)      |
+|   2    | joint_pos_rel      |       (9,)      |
+|   3    | joint_vel_rel      |       (9,)      |
+|   4    | actions            |       (8,)      |
+|   5    | wrist              |  (480, 640, 3)  |
+|   6    | front              |  (480, 640, 3)  |
+|   7    | joint_pos_target   |       (9,)      |
++--------+--------------------+-----------------+
+
+[INFO] Termination Manager:  <TerminationManager> contains 2 active terms.
++-----------------------------+
+|   Active Termination Terms  |
++-------+----------+----------+
+| Index | Name     | Time Out |
++-------+----------+----------+
+|   0   | time_out |   True   |
+|   1   | success  |  False   |
++-------+----------+----------+
+
+[INFO] Reward Manager:  <RewardManager> contains 0 active terms.
++-----------------------+
+|  Active Reward Terms  |
++-------+------+--------+
+| Index | Name | Weight |
++-------+------+--------+
++-------+------+--------+
+
+[INFO] Curriculum Manager:  <CurriculumManager> contains 0 active terms.
++----------------------+
+| Active Curriculum Terms |
++-----------+----------+
+|   Index   | Name     |
++-----------+----------+
++-----------+----------+
+
+[INFO]: Completed setting up the environment...
+[rollout] warming up renderer (20 app updates)...
+[rollout] resetting environment...
+[rollout] env.reset() returned
+[rollout] camera_infos = {'wrist': (480, 640), 'front': (480, 640)}; loading policy...
+Loading local LeRobot policy 'diffusion' from outputs/my_policy_v2...
+Loading weights from local directory
+Local LeRobot policy is ready.
+Viewports docked: [Viewport (Persp)] | [Viewport 2 (Camera)]
+[Evaluation] Evaluating episode 1...
+[SCENE] episode start
+  plate =(0.500, -0.400, 0.050)
+  fork  =(0.548, -0.142, 0.120)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.120)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.350, -0.428, 0.610)  gripper(finger1)=0.0400
+[DEBUG] first action chunk: [-0.0017268061637878418, -0.6633883714675903, -0.006462216377258301, -2.3983895778656006, -0.0016803145408630371, 1.7309317588806152, 0.7772878408432007, 0.9945552349090576]
+[step=80] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.352, -0.366, 0.562)  gripper(finger1)=0.0397
+2026-06-11T05:26:40Z [21,242ms] [Warning] [carb] Client gpu.foundation.plugin has acquired [gpu::unstable::IMemoryBudgetManagerFactory v0.1] 100 times. Consider accessing this interface with carb::getCachedInterface() (Performance warning)
+[step=160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.360, -0.353, 0.500)  gripper(finger1)=0.0400
+[step=240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.365, -0.343, 0.481)  gripper(finger1)=0.0400
+[step=320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.370, -0.322, 0.477)  gripper(finger1)=0.0400
+[step=400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.373, -0.302, 0.451)  gripper(finger1)=0.0400
+[step=480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.379, -0.279, 0.417)  gripper(finger1)=0.0400
+[step=560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.386, -0.253, 0.387)  gripper(finger1)=0.0400
+[step=640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.393, -0.225, 0.362)  gripper(finger1)=0.0400
+[step=720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.398, -0.201, 0.336)  gripper(finger1)=0.0400
+[step=800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.403, -0.181, 0.307)  gripper(finger1)=0.0400
+[step=880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.407, -0.160, 0.276)  gripper(finger1)=0.0400
+[step=960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.411, -0.146, 0.242)  gripper(finger1)=0.0400
+[step=1040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.415, -0.134, 0.206)  gripper(finger1)=0.0400
+[step=1120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.073, 0.044)  dist=0.329  right_of_plate=N  within_15cm=N
+  EE    =(0.419, -0.118, 0.173)  gripper(finger1)=0.0400
+[step=1200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.424, -0.100, 0.166)  gripper(finger1)=0.0396
+[step=1280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.424, -0.089, 0.171)  gripper(finger1)=0.0293
+[step=1360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.419, -0.101, 0.160)  gripper(finger1)=0.0024
+[step=1440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.412, -0.115, 0.155)  gripper(finger1)=0.0001
+[step=1520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.408, -0.114, 0.162)  gripper(finger1)=0.0001
+[step=1600] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.406, -0.116, 0.176)  gripper(finger1)=0.0001
+[step=1680] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.404, -0.117, 0.195)  gripper(finger1)=0.0001
+[step=1760] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.401, -0.120, 0.217)  gripper(finger1)=0.0001
+[step=1840] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.399, -0.124, 0.239)  gripper(finger1)=0.0001
+[step=1920] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.399, -0.128, 0.261)  gripper(finger1)=0.0001
+[step=2000] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.401, -0.131, 0.285)  gripper(finger1)=0.0001
+[step=2080] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.403, -0.136, 0.309)  gripper(finger1)=0.0001
+[step=2160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.406, -0.142, 0.332)  gripper(finger1)=0.0001
+[step=2240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.409, -0.143, 0.357)  gripper(finger1)=0.0001
+[step=2320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.412, -0.145, 0.382)  gripper(finger1)=0.0001
+[step=2400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.416, -0.152, 0.403)  gripper(finger1)=0.0001
+[step=2480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.420, -0.179, 0.401)  gripper(finger1)=0.0001
+[step=2560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.424, -0.200, 0.393)  gripper(finger1)=0.0001
+[step=2640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.428, -0.228, 0.372)  gripper(finger1)=0.0001
+[step=2720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.434, -0.253, 0.347)  gripper(finger1)=0.0001
+[step=2800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.439, -0.273, 0.325)  gripper(finger1)=0.0001
+[step=2880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.441, -0.293, 0.306)  gripper(finger1)=0.0001
+[step=2960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.444, -0.310, 0.291)  gripper(finger1)=0.0001
+[step=3040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.446, -0.323, 0.278)  gripper(finger1)=0.0001
+[step=3120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.447, -0.339, 0.266)  gripper(finger1)=0.0001
+[step=3200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.448, -0.350, 0.254)  gripper(finger1)=0.0001
+[step=3280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.449, -0.362, 0.242)  gripper(finger1)=0.0001
+[step=3360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.447, -0.367, 0.230)  gripper(finger1)=0.0001
+[step=3440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.439, -0.377, 0.226)  gripper(finger1)=0.0001
+[step=3520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.433, -0.374, 0.221)  gripper(finger1)=0.0001
+[step=3600] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.425, -0.374, 0.196)  gripper(finger1)=0.0001
+[step=3680] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.412, -0.382, 0.181)  gripper(finger1)=0.0001
+[step=3760] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.401, -0.367, 0.183)  gripper(finger1)=0.0001
+[step=3840] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.395, -0.352, 0.207)  gripper(finger1)=0.0001
+[step=3920] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.387, -0.352, 0.234)  gripper(finger1)=0.0001
+[step=4000] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.383, -0.357, 0.260)  gripper(finger1)=0.0001
+[step=4080] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.387, -0.370, 0.276)  gripper(finger1)=0.0001
+[step=4160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.393, -0.379, 0.283)  gripper(finger1)=0.0001
+[step=4240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.400, -0.377, 0.291)  gripper(finger1)=0.0001
+[step=4320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.408, -0.368, 0.285)  gripper(finger1)=0.0028
+[step=4400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.412, -0.384, 0.267)  gripper(finger1)=0.0001
+[step=4480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.414, -0.396, 0.243)  gripper(finger1)=0.0001
+[step=4560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.415, -0.393, 0.230)  gripper(finger1)=0.0001
+[step=4640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.412, -0.377, 0.216)  gripper(finger1)=0.0001
+[step=4720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.407, -0.381, 0.206)  gripper(finger1)=0.0334
+[step=4800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.403, -0.369, 0.230)  gripper(finger1)=0.0398
+[step=4880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.402, -0.346, 0.257)  gripper(finger1)=0.0400
+[step=4960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.405, -0.341, 0.252)  gripper(finger1)=0.0400
+[step=5040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.405, -0.339, 0.223)  gripper(finger1)=0.0400
+[step=5120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.399, -0.335, 0.198)  gripper(finger1)=0.0400
+[step=5200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.381, -0.310, 0.191)  gripper(finger1)=0.0400
+[step=5280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.355, -0.275, 0.192)  gripper(finger1)=0.0400
+[step=5360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.340, -0.254, 0.186)  gripper(finger1)=0.0400
+[step=5440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.331, -0.251, 0.163)  gripper(finger1)=0.0400
+[step=5520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.313, -0.242, 0.156)  gripper(finger1)=0.0400
+[step=5600] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.290, -0.226, 0.154)  gripper(finger1)=0.0400
+[step=5680] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.266, -0.212, 0.153)  gripper(finger1)=0.0400
+[step=5760] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.246, -0.200, 0.154)  gripper(finger1)=0.0400
+[step=5840] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.229, -0.189, 0.153)  gripper(finger1)=0.0400
+[step=5920] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.218, -0.177, 0.153)  gripper(finger1)=0.0400
+[step=6000] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.206, -0.167, 0.153)  gripper(finger1)=0.0400
+[step=6080] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.193, -0.156, 0.153)  gripper(finger1)=0.0400
+[step=6160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.179, -0.146, 0.153)  gripper(finger1)=0.0396
+[step=6240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.161, -0.132, 0.153)  gripper(finger1)=0.0400
+[step=6320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.143, -0.118, 0.154)  gripper(finger1)=0.0400
+[step=6400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.125, -0.105, 0.154)  gripper(finger1)=0.0400
+[step=6480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.112, -0.094, 0.153)  gripper(finger1)=0.0399
+[step=6560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.101, -0.082, 0.153)  gripper(finger1)=0.0400
+[step=6640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.091, -0.071, 0.153)  gripper(finger1)=0.0399
+[step=6720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.083, -0.063, 0.153)  gripper(finger1)=0.0400
+[step=6800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.077, -0.059, 0.153)  gripper(finger1)=0.0400
+[step=6880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.073, -0.053, 0.153)  gripper(finger1)=0.0400
+[step=6960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.071, -0.050, 0.153)  gripper(finger1)=0.0400
+[step=7040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.069, -0.042, 0.155)  gripper(finger1)=0.0400
+[step=7120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.069, -0.038, 0.154)  gripper(finger1)=0.0400
+[step=7200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.069, -0.034, 0.154)  gripper(finger1)=0.0400
+[step=7280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.068, -0.030, 0.154)  gripper(finger1)=0.0400
+[step=7360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.068, -0.029, 0.155)  gripper(finger1)=0.0192
+[step=7440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.072, -0.029, 0.159)  gripper(finger1)=0.0009
+[step=7520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.078, -0.028, 0.175)  gripper(finger1)=0.0001
+[step=7600] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.082, -0.022, 0.206)  gripper(finger1)=0.0001
+[step=7680] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.084, -0.009, 0.247)  gripper(finger1)=0.0001
+[step=7760] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.091, -0.011, 0.279)  gripper(finger1)=0.0001
+[step=7840] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.095, -0.011, 0.307)  gripper(finger1)=0.0001
+[step=7920] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.099, -0.014, 0.332)  gripper(finger1)=0.0001
+[step=8000] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.101, -0.016, 0.361)  gripper(finger1)=0.0001
+[step=8080] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.104, -0.022, 0.387)  gripper(finger1)=0.0001
+[step=8160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.109, -0.029, 0.413)  gripper(finger1)=0.0001
+[step=8240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.113, -0.035, 0.436)  gripper(finger1)=0.0001
+[step=8320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.127, -0.061, 0.439)  gripper(finger1)=0.0001
+[step=8400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.132, -0.061, 0.465)  gripper(finger1)=0.0001
+[step=8480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.150, -0.093, 0.467)  gripper(finger1)=0.0001
+[step=8560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.168, -0.121, 0.466)  gripper(finger1)=0.0001
+[step=8640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.184, -0.143, 0.465)  gripper(finger1)=0.0001
+[step=8720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.200, -0.165, 0.459)  gripper(finger1)=0.0001
+[step=8800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.217, -0.185, 0.450)  gripper(finger1)=0.0001
+[step=8880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.231, -0.203, 0.441)  gripper(finger1)=0.0001
+[step=8960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.246, -0.223, 0.426)  gripper(finger1)=0.0001
+[step=9040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.261, -0.240, 0.411)  gripper(finger1)=0.0001
+[step=9120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.276, -0.254, 0.394)  gripper(finger1)=0.0001
+[step=9200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.291, -0.267, 0.375)  gripper(finger1)=0.0001
+[step=9280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.307, -0.281, 0.355)  gripper(finger1)=0.0001
+[step=9360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.322, -0.296, 0.334)  gripper(finger1)=0.0001
+[step=9440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.337, -0.312, 0.312)  gripper(finger1)=0.0001
+[step=9520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.548, -0.142, 0.037)  dist=0.263  left_of_plate=N  within_15cm=N
+  knife =(0.460, -0.072, 0.044)  dist=0.331  right_of_plate=N  within_15cm=N
+  EE    =(0.353, -0.326, 0.294)  gripper(finger1)=0.0001
+[step=9600] [SCENE] progress
+  plate =(0.500, -0.400, 0.050)
+  fork  =(0.569, -0.099, 0.120)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.120)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.350, -0.433, 0.600)  gripper(finger1)=0.0400
+[SCENE] TIMEOUT — final positions
+  plate =(0.500, -0.400, 0.050)
+  fork  =(0.569, -0.099, 0.120)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.120)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.350, -0.433, 0.600)  gripper(finger1)=0.0400
+[Evaluation] Episode 1 timed out!
+[Evaluation] now success rate: 0.0  [0/1]
+[Evaluation] Evaluating episode 2...
+[SCENE] episode start
+  plate =(0.500, -0.400, 0.050)
+  fork  =(0.569, -0.099, 0.120)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.120)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.350, -0.433, 0.600)  gripper(finger1)=0.0400
+[step=80] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.350, -0.392, 0.578)  gripper(finger1)=0.0400
+[step=160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.356, -0.362, 0.513)  gripper(finger1)=0.0400
+[step=240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.362, -0.338, 0.463)  gripper(finger1)=0.0400
+[step=320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.367, -0.319, 0.441)  gripper(finger1)=0.0400
+[step=400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.370, -0.296, 0.433)  gripper(finger1)=0.0400
+[step=480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.375, -0.276, 0.412)  gripper(finger1)=0.0400
+[step=560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.379, -0.257, 0.378)  gripper(finger1)=0.0400
+[step=640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.385, -0.235, 0.342)  gripper(finger1)=0.0400
+[step=720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.390, -0.214, 0.308)  gripper(finger1)=0.0400
+[step=800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.395, -0.193, 0.276)  gripper(finger1)=0.0400
+[step=880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.397, -0.178, 0.245)  gripper(finger1)=0.0400
+[step=960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.397, -0.166, 0.214)  gripper(finger1)=0.0400
+[step=1040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.395, -0.154, 0.184)  gripper(finger1)=0.0400
+[step=1120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.390, -0.155, 0.156)  gripper(finger1)=0.0400
+[step=1200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.387, -0.143, 0.156)  gripper(finger1)=0.0400
+[step=1280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.385, -0.129, 0.154)  gripper(finger1)=0.0400
+[step=1360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.379, -0.114, 0.153)  gripper(finger1)=0.0400
+[step=1440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.372, -0.092, 0.154)  gripper(finger1)=0.0400
+[step=1520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.365, -0.080, 0.154)  gripper(finger1)=0.0400
+[step=1600] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.361, -0.069, 0.153)  gripper(finger1)=0.0400
+[step=1680] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.356, -0.055, 0.153)  gripper(finger1)=0.0400
+[step=1760] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.354, -0.045, 0.153)  gripper(finger1)=0.0400
+[step=1840] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.353, -0.037, 0.153)  gripper(finger1)=0.0400
+[step=1920] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.351, -0.026, 0.153)  gripper(finger1)=0.0400
+[step=2000] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.350, -0.019, 0.153)  gripper(finger1)=0.0400
+[step=2080] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.350, -0.009, 0.149)  gripper(finger1)=0.0400
+[step=2160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, -0.001, 0.138)  gripper(finger1)=0.0400
+[step=2240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, 0.004, 0.124)  gripper(finger1)=0.0400
+[step=2320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, 0.005, 0.109)  gripper(finger1)=0.0400
+[step=2400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, 0.006, 0.103)  gripper(finger1)=0.0400
+[step=2480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.348, 0.008, 0.108)  gripper(finger1)=0.0400
+[step=2560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, 0.013, 0.122)  gripper(finger1)=0.0400
+[step=2640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, 0.018, 0.135)  gripper(finger1)=0.0400
+[step=2720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, 0.021, 0.146)  gripper(finger1)=0.0400
+[step=2800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.350, 0.024, 0.149)  gripper(finger1)=0.0400
+[step=2880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, 0.027, 0.151)  gripper(finger1)=0.0400
+[step=2960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, 0.031, 0.156)  gripper(finger1)=0.0400
+[step=3040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.351, 0.034, 0.166)  gripper(finger1)=0.0400
+[step=3120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.352, 0.038, 0.178)  gripper(finger1)=0.0400
+[step=3200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.354, 0.041, 0.188)  gripper(finger1)=0.0400
+[step=3280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.355, 0.039, 0.189)  gripper(finger1)=0.0400
+[step=3360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.356, 0.040, 0.185)  gripper(finger1)=0.0400
+[step=3440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.357, 0.038, 0.178)  gripper(finger1)=0.0400
+[step=3520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.359, 0.038, 0.174)  gripper(finger1)=0.0400
+[step=3600] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.360, 0.037, 0.173)  gripper(finger1)=0.0400
+[step=3680] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.362, 0.038, 0.176)  gripper(finger1)=0.0400
+[step=3760] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.363, 0.038, 0.181)  gripper(finger1)=0.0400
+[step=3840] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.365, 0.039, 0.184)  gripper(finger1)=0.0400
+[step=3920] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.368, 0.039, 0.182)  gripper(finger1)=0.0400
+[step=4000] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.371, 0.039, 0.180)  gripper(finger1)=0.0400
+[step=4080] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.373, 0.038, 0.179)  gripper(finger1)=0.0400
+[step=4160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.376, 0.038, 0.179)  gripper(finger1)=0.0400
+[step=4240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.379, 0.038, 0.181)  gripper(finger1)=0.0400
+[step=4320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.385, 0.037, 0.181)  gripper(finger1)=0.0400
+[step=4400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.391, 0.036, 0.180)  gripper(finger1)=0.0365
+[step=4480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.399, 0.035, 0.178)  gripper(finger1)=0.0048
+[step=4560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.407, 0.027, 0.181)  gripper(finger1)=0.0002
+[step=4640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.417, 0.029, 0.202)  gripper(finger1)=0.0001
+[step=4720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.425, 0.030, 0.237)  gripper(finger1)=0.0001
+[step=4800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.433, 0.032, 0.280)  gripper(finger1)=0.0001
+[step=4880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.441, 0.028, 0.323)  gripper(finger1)=0.0001
+[step=4960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.449, 0.018, 0.364)  gripper(finger1)=0.0001
+[step=5040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.457, 0.009, 0.404)  gripper(finger1)=0.0001
+[step=5120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.462, -0.005, 0.439)  gripper(finger1)=0.0001
+[step=5200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.467, -0.020, 0.472)  gripper(finger1)=0.0001
+[step=5280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.468, -0.040, 0.501)  gripper(finger1)=0.0001
+[step=5360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.468, -0.086, 0.505)  gripper(finger1)=0.0001
+[step=5440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.470, -0.137, 0.502)  gripper(finger1)=0.0001
+[step=5520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.469, -0.192, 0.496)  gripper(finger1)=0.0001
+[step=5600] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.465, -0.246, 0.494)  gripper(finger1)=0.0001
+[step=5680] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.455, -0.293, 0.500)  gripper(finger1)=0.0001
+[step=5760] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.446, -0.315, 0.510)  gripper(finger1)=0.0001
+[step=5840] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.437, -0.332, 0.509)  gripper(finger1)=0.0001
+[step=5920] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.432, -0.335, 0.505)  gripper(finger1)=0.0001
+[step=6000] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.428, -0.335, 0.492)  gripper(finger1)=0.0001
+[step=6080] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.426, -0.340, 0.470)  gripper(finger1)=0.0001
+[step=6160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.425, -0.342, 0.457)  gripper(finger1)=0.0001
+[step=6240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.421, -0.338, 0.454)  gripper(finger1)=0.0001
+[step=6320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.416, -0.330, 0.457)  gripper(finger1)=0.0001
+[step=6400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.413, -0.320, 0.465)  gripper(finger1)=0.0001
+[step=6480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.410, -0.318, 0.471)  gripper(finger1)=0.0001
+[step=6560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.407, -0.320, 0.479)  gripper(finger1)=0.0001
+[step=6640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.403, -0.318, 0.494)  gripper(finger1)=0.0001
+[step=6720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.399, -0.319, 0.504)  gripper(finger1)=0.0001
+[step=6800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.394, -0.326, 0.503)  gripper(finger1)=0.0001
+[step=6880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.393, -0.329, 0.494)  gripper(finger1)=0.0001
+[step=6960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.393, -0.331, 0.480)  gripper(finger1)=0.0001
+[step=7040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.395, -0.333, 0.467)  gripper(finger1)=0.0001
+[step=7120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.395, -0.333, 0.460)  gripper(finger1)=0.0001
+[step=7200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.393, -0.332, 0.458)  gripper(finger1)=0.0001
+[step=7280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.390, -0.324, 0.465)  gripper(finger1)=0.0001
+[step=7360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.387, -0.310, 0.480)  gripper(finger1)=0.0001
+[step=7440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.383, -0.315, 0.490)  gripper(finger1)=0.0001
+[step=7520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.375, -0.300, 0.523)  gripper(finger1)=0.0001
+[step=7600] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.367, -0.317, 0.523)  gripper(finger1)=0.0001
+[step=7680] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.360, -0.315, 0.528)  gripper(finger1)=0.0001
+[step=7760] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.359, -0.332, 0.510)  gripper(finger1)=0.0001
+[step=7840] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.359, -0.336, 0.496)  gripper(finger1)=0.0001
+[step=7920] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.360, -0.332, 0.484)  gripper(finger1)=0.0001
+[step=8000] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.363, -0.333, 0.466)  gripper(finger1)=0.0001
+[step=8080] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.364, -0.331, 0.451)  gripper(finger1)=0.0001
+[step=8160] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.364, -0.324, 0.445)  gripper(finger1)=0.0001
+[step=8240] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.365, -0.319, 0.444)  gripper(finger1)=0.0001
+[step=8320] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.362, -0.309, 0.462)  gripper(finger1)=0.0001
+[step=8400] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.351, -0.291, 0.512)  gripper(finger1)=0.0001
+[step=8480] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.347, -0.311, 0.527)  gripper(finger1)=0.0001
+[step=8560] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.342, -0.329, 0.514)  gripper(finger1)=0.0001
+[step=8640] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.342, -0.333, 0.492)  gripper(finger1)=0.0001
+[step=8720] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, -0.332, 0.466)  gripper(finger1)=0.0001
+[step=8800] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.355, -0.333, 0.445)  gripper(finger1)=0.0001
+[step=8880] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.360, -0.330, 0.439)  gripper(finger1)=0.0001
+[step=8960] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.362, -0.328, 0.439)  gripper(finger1)=0.0001
+[step=9040] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.360, -0.331, 0.440)  gripper(finger1)=0.0001
+[step=9120] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.352, -0.314, 0.469)  gripper(finger1)=0.0001
+[step=9200] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.349, -0.315, 0.490)  gripper(finger1)=0.0001
+[step=9280] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.347, -0.319, 0.501)  gripper(finger1)=0.0001
+[step=9360] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.346, -0.321, 0.504)  gripper(finger1)=0.0001
+[step=9440] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.342, -0.315, 0.520)  gripper(finger1)=0.0001
+[step=9520] [SCENE] progress
+  plate =(0.500, -0.400, 0.041)
+  fork  =(0.569, -0.099, 0.037)  dist=0.309  left_of_plate=N  within_15cm=N
+  knife =(0.482, -0.104, 0.044)  dist=0.297  right_of_plate=N  within_15cm=N
+  EE    =(0.343, -0.328, 0.521)  gripper(finger1)=0.0001
+[step=9600] [SCENE] progress
+  plate =(0.500, -0.400, 0.050)
+  fork  =(0.580, -0.069, 0.120)  dist=0.341  left_of_plate=N  within_15cm=N
+  knife =(0.514, -0.125, 0.120)  dist=0.276  right_of_plate=Y  within_15cm=N
+  EE    =(0.350, -0.433, 0.600)  gripper(finger1)=0.0400
+[SCENE] TIMEOUT — final positions
+  plate =(0.500, -0.400, 0.050)
+  fork  =(0.580, -0.069, 0.120)  dist=0.341  left_of_plate=N  within_15cm=N
+  knife =(0.514, -0.125, 0.120)  dist=0.276  right_of_plate=Y  within_15cm=N
+  EE    =(0.350, -0.433, 0.600)  gripper(finger1)=0.0400
+[Evaluation] Episode 2 timed out!
+[Evaluation] now success rate: 0.0  [0/2]
+[Evaluation] Final success rate: 0.000  [0/2]
+[DEBUG] fork pos: [0.5795664191246033, -0.06884586811065674, 0.11999999731779099]
+[DEBUG] knife pos: [0.5137948393821716, -0.12471004575490952, 0.11999999731779099]
+[DEBUG] plate pos: [0.5, -0.4000000059604645, 0.05000000074505806]
