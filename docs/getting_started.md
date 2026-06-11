@@ -266,6 +266,7 @@ Recommended starting point when you only have about `16` usable UMI entries:
 - `--augment_pose_factor 10` to turn `16` base entries into about `160` replay episodes.
 - Keep `--augment_yaw_jitter_deg 0` at first for maximum stability.
 - Add `--augment_mix_objects` only if you need more diversity after confirming the scripted policy still succeeds reliably.
+- For `HCIS-CutleryArrangement-SingleArm-v0`, Step 3 also blends a subset of augmented scenes toward the eval initial-pose distribution while keeping the rest broader, so training does not collapse onto only the public eval start states.
 
 ### Upload the generated dataset
 

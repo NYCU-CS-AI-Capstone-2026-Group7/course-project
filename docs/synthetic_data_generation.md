@@ -180,6 +180,7 @@ Key flags:
 | `--augment_global_xy_jitter`, `--augment_local_xy_jitter` | Scene-level and per-object translation jitter in meters. |
 | `--augment_yaw_jitter_deg` | Optional world-yaw jitter. Keep it at `0` first if you want the safest scripted rollouts. |
 | `--augment_mix_objects` | Recombine object poses across episodes before jittering. Higher diversity, slightly higher risk. |
+| `--cutlery_eval_pose_fraction`, `--cutlery_eval_pose_jitter` | For the cutlery task only: rewrite part of the augmented replay set so fork/knife starts resemble the eval initial-pose distribution, while keeping the remaining episodes broader. |
 | `--resume` | Append to an existing dataset (`EXPORT_SUCCEEDED_ONLY_RESUME`) instead of starting fresh. |
 | `--seed` | Optional. Defaults to `int(time.time())`. |
 

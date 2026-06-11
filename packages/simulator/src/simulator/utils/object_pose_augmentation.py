@@ -15,6 +15,11 @@ from simulator.utils.object_poses_loader import WorldPose
 
 EpisodeWorldPoses = dict[str, WorldPose]
 
+_CUTLERY_EVAL_BASE_XY: dict[str, tuple[float, float]] = {
+    "knife": (0.50, -0.10),
+    "fork": (0.55, -0.10),
+}
+
 
 class PoseAugmentationError(ValueError):
     """Raised when pose augmentation inputs are malformed."""
@@ -95,6 +100,61 @@ def augment_episode_world_poses(
     return out
 
 
+def inject_cutlery_eval_pose_distribution(
+    episodes: list[EpisodeWorldPoses],
+    *,
+    seed: int,
+    eval_like_fraction: float,
+    eval_xy_jitter: float,
+    replaceable_start_index: int = 0,
+    min_object_distance: float = 0.0,
+    max_attempts: int = 64,
+) -> list[EpisodeWorldPoses]:
+    """Blend eval-like cutlery starts into an existing replay set.
+
+    A subset of the replaceable episodes is rewritten so fork/knife spawn near
+    the public eval distribution, while the remaining episodes keep the broader
+    UMI-derived or augmented scene coverage. This helps datagen see some scenes
+    close to eval without collapsing the whole dataset onto that narrow range.
+    """
+    if not episodes:
+        return []
+    if not 0.0 <= eval_like_fraction <= 1.0:
+        raise PoseAugmentationError(
+            f"eval_like_fraction must be in [0, 1], got {eval_like_fraction}"
+        )
+    if eval_xy_jitter < 0.0:
+        raise PoseAugmentationError(f"eval_xy_jitter must be non-negative, got {eval_xy_jitter}")
+    if max_attempts < 1:
+        raise PoseAugmentationError(f"max_attempts must be >= 1, got {max_attempts}")
+    if not 0 <= replaceable_start_index <= len(episodes):
+        raise PoseAugmentationError(
+            "replaceable_start_index must be within the episode list bounds"
+        )
+
+    object_names = set(episodes[0].keys())
+    if not set(_CUTLERY_EVAL_BASE_XY).issubset(object_names):
+        return [_clone_episode(episode) for episode in episodes]
+
+    out = [_clone_episode(episode) for episode in episodes]
+    replaceable_indices = list(range(replaceable_start_index, len(out)))
+    if not replaceable_indices or eval_like_fraction == 0.0:
+        return out
+
+    rng = random.Random(seed)
+    target_count = max(1, round(len(replaceable_indices) * eval_like_fraction))
+    for episode_index in rng.sample(replaceable_indices, k=min(target_count, len(replaceable_indices))):
+        source_episode = rng.choice(out[:replaceable_start_index] or out)
+        out[episode_index] = _sample_cutlery_eval_episode(
+            base_episode=source_episode,
+            rng=rng,
+            eval_xy_jitter=eval_xy_jitter,
+            min_object_distance=min_object_distance,
+            max_attempts=max_attempts,
+        )
+    return out
+
+
 def _sample_augmented_episode(
     *,
     base_episode: EpisodeWorldPoses,
@@ -127,6 +187,31 @@ def _sample_augmented_episode(
         if _has_valid_separation(episode, min_object_distance):
             return episode
 
+    return _clone_episode(base_episode)
+
+
+def _sample_cutlery_eval_episode(
+    *,
+    base_episode: EpisodeWorldPoses,
+    rng: random.Random,
+    eval_xy_jitter: float,
+    min_object_distance: float,
+    max_attempts: int,
+) -> EpisodeWorldPoses:
+    for _ in range(max_attempts):
+        episode = _clone_episode(base_episode)
+        for name, (base_x, base_y) in _CUTLERY_EVAL_BASE_XY.items():
+            pos, quat = episode[name]
+            episode[name] = (
+                (
+                    base_x + rng.uniform(-eval_xy_jitter, eval_xy_jitter),
+                    base_y + rng.uniform(-eval_xy_jitter, eval_xy_jitter),
+                    pos[2],
+                ),
+                quat,
+            )
+        if _has_valid_separation(episode, min_object_distance):
+            return episode
     return _clone_episode(base_episode)
 
 

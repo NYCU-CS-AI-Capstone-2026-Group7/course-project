@@ -5,6 +5,7 @@ import pytest
 from simulator.utils.object_pose_augmentation import (
     PoseAugmentationError,
     augment_episode_world_poses,
+    inject_cutlery_eval_pose_distribution,
 )
 
 
@@ -108,3 +109,39 @@ def test_inconsistent_object_sets_raise():
 
     with pytest.raises(PoseAugmentationError, match="object set"):
         augment_episode_world_poses(episodes, factor=2, seed=1)
+
+
+def test_inject_cutlery_eval_pose_distribution_rewrites_only_augmented_subset():
+    episodes = [
+        _episode((0.10, -0.20), (0.20, -0.20)),
+        _episode((0.30, -0.30), (0.40, -0.30)),
+        _episode((0.50, -0.35), (0.60, -0.35)),
+    ]
+
+    out = inject_cutlery_eval_pose_distribution(
+        episodes,
+        seed=13,
+        eval_like_fraction=0.5,
+        eval_xy_jitter=0.0,
+        replaceable_start_index=1,
+        min_object_distance=0.05,
+    )
+
+    assert out[0] == episodes[0]
+    assert len(out) == len(episodes)
+    assert any(
+        episode["knife"][0][:2] == (0.50, -0.10) and episode["fork"][0][:2] == (0.55, -0.10)
+        for episode in out[1:]
+    )
+
+
+def test_inject_cutlery_eval_pose_distribution_validates_fraction():
+    episodes = [_episode((0.10, -0.20), (0.20, -0.20))]
+
+    with pytest.raises(PoseAugmentationError, match="eval_like_fraction"):
+        inject_cutlery_eval_pose_distribution(
+            episodes,
+            seed=1,
+            eval_like_fraction=1.5,
+            eval_xy_jitter=0.01,
+        )

@@ -78,6 +78,18 @@ parser.add_argument(
     action="store_true",
     help="Mix object poses across different source episodes before jittering. Increases diversity but is slightly riskier than jitter-only augmentation.",
 )
+parser.add_argument(
+    "--cutlery_eval_pose_fraction",
+    type=float,
+    default=0.35,
+    help="For the cutlery task only: rewrite this fraction of augmented episodes so fork/knife start near the eval initial-pose distribution.",
+)
+parser.add_argument(
+    "--cutlery_eval_pose_jitter",
+    type=float,
+    default=0.05,
+    help="For the cutlery task only: XY jitter in meters around the eval base poses when injecting eval-like initial states.",
+)
 parser.add_argument("--quality", action="store_true", help="Whether to enable quality render mode.")
 parser.add_argument("--use_lerobot_recorder", action="store_true", help="Whether to use lerobot recorder.")
 parser.add_argument("--lerobot_dataset_repo_id", type=str, default=None, help="Lerobot Dataset repository ID.")
@@ -104,7 +116,10 @@ from leisaac.utils.env_utils import dynamic_reset_gripper_effort_limit_sim
 from simulator.datagen.state_machine.cup_stacking import CupStackingStateMachine
 from simulator.datagen.state_machine.cutlery_arrangement import CutleryArrangementStateMachine
 from simulator.datagen.state_machine.toy_blocks_collection import ToyBlocksCollectionStateMachine
-from simulator.utils.object_pose_augmentation import augment_episode_world_poses
+from simulator.utils.object_pose_augmentation import (
+    augment_episode_world_poses,
+    inject_cutlery_eval_pose_distribution,
+)
 from simulator.utils.object_poses_loader import load_episode_poses
 
 # Maps gym task id → (StateMachineClass, device_type)
@@ -361,6 +376,19 @@ def main():
             "Augmented replay episodes: "
             f"{base_episode_count} -> {len(episodes)} "
             f"(factor={args_cli.augment_pose_factor}, mix_objects={args_cli.augment_mix_objects}, seed={run_seed})"
+        )
+    if task_name == "HCIS-CutleryArrangement-SingleArm-v0":
+        episodes = inject_cutlery_eval_pose_distribution(
+            episodes,
+            seed=run_seed,
+            eval_like_fraction=args_cli.cutlery_eval_pose_fraction,
+            eval_xy_jitter=args_cli.cutlery_eval_pose_jitter,
+            replaceable_start_index=base_episode_count,
+            min_object_distance=args_cli.augment_min_object_distance,
+        )
+        print(
+            "Blended cutlery eval-like starts into replay set: "
+            f"fraction={args_cli.cutlery_eval_pose_fraction}, jitter={args_cli.cutlery_eval_pose_jitter}"
         )
 
     is_direct_env = "Direct" in task_name
