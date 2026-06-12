@@ -35,6 +35,17 @@ echo "[3/5] Preparing IsaacLab build dependencies (numpy==1.26.0)..."
 uv pip install setuptools==65 wheel==0.45.1 toml==0.10.2 packaging==23.0 poetry-core==2.2.1 numpy==1.26.0
 
 # 5. Compile and install IsaacLab
+# Setup a temporary cmake wrapper to handle newer CMake compatibility errors with older packages (e.g. egl-probe)
+CMAKE_PATH=$(command -v cmake || true)
+if [ -n "$CMAKE_PATH" ]; then
+    echo "[INFO] Setting up temporary CMake wrapper for compatibility..."
+    mkdir -p /tmp/cmake_wrapper
+    echo '#!/bin/bash' > /tmp/cmake_wrapper/cmake
+    echo "$CMAKE_PATH -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \"\$@\"" >> /tmp/cmake_wrapper/cmake
+    chmod +x /tmp/cmake_wrapper/cmake
+    export PATH=/tmp/cmake_wrapper:$PATH
+fi
+
 echo "[4/5] Compiling and installing IsaacLab extensions..."
 # Temporarily patch the script to use 'uv pip' for faster installation
 sed -i 's/python -m pip/uv pip/g' dependencies/IsaacLab/isaaclab.sh
