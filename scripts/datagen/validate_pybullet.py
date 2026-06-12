@@ -43,7 +43,7 @@ _TABLE_CENTER_X = 0.353162
 _TABLE_CENTER_Y = -0.351832
 
 _HOVER_Z_OFFSET = 0.15
-_GRASP_Z_OFFSET = 0.08
+_GRASP_Z_OFFSET = 0.105
 _LIFT_Z_OFFSET = 0.22
 _RELEASE_Z_OFFSET = 0.09
 
@@ -119,7 +119,7 @@ def normalize_angle(angle: float) -> float:
 class PyBulletFrankaValidator:
     """Validator using PyBullet physics engine for lightweight CPU simulations."""
 
-    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0, allow_plate_collision=False, arm_physics=False, self_collision_margin=-0.01, robot_obj_collision_margin=0.005, obj_obj_collision_margin=0.005, spawn_margin=(0.12, 0.12, 0.15, 0.12), yaw_dist="uniform", yaw_std=15.0, fork_mean_yaw=180.0, knife_mean_yaw=0.0):
+    def __init__(self, use_gui=False, verbose=False, fps=100.0, min_dist=0.273, reconnect_interval=10.0, allow_plate_collision=False, arm_physics=False, self_collision_margin=-0.01, robot_obj_collision_margin=0.005, obj_obj_collision_margin=0.005, spawn_margin=(0.12, 0.12, 0.15, 0.12), yaw_dist="uniform", yaw_std=15.0, fork_mean_yaw=180.0, knife_mean_yaw=0.0, physics_steps=10, settle_steps=50):
         self.use_gui = use_gui
         self.verbose = verbose
         self.sleep_time = 1.0 / fps if fps > 0 else 0.0
@@ -145,6 +145,8 @@ class PyBulletFrankaValidator:
         self.last_reconnect_time = time.time()
         self.allow_plate_collision = allow_plate_collision
         self.arm_physics = arm_physics
+        self.physics_steps = physics_steps
+        self.settle_steps = settle_steps
         self.objects = {}
         
         self.initialize_pybullet()
@@ -524,7 +526,7 @@ class PyBulletFrankaValidator:
                 else:
                     target_orient = p.getQuaternionFromEuler([math.pi, 0, target_yaw_val + math.pi/2])
                 
-                # Solve Inverse Kinematics command
+                # Solve Inverse Kinematics command using built-in parameters for precision (tolerance < 0.5cm)
                 joint_angles = p.calculateInverseKinematics(
                     self.robot_id,
                     self.ee_index,
@@ -533,7 +535,9 @@ class PyBulletFrankaValidator:
                     lowerLimits=self.ik_lower_limits,
                     upperLimits=self.ik_upper_limits,
                     jointRanges=self.ik_joint_ranges,
-                    restPoses=self.ik_rest_poses
+                    restPoses=self.ik_rest_poses,
+                    residualThreshold=0.005,
+                    maxNumIterations=10
                 )
                 
                 # Apply joint angles
@@ -555,7 +559,7 @@ class PyBulletFrankaValidator:
                     p.setJointMotorControl2(self.robot_id, 10, p.POSITION_CONTROL, targetPosition=finger_target, force=100.0)
                     
                     # Run physics steps to let the arm move to target
-                    physics_steps = 20
+                    physics_steps = self.physics_steps
                     for _ in range(physics_steps):
                         p.stepSimulation()
                         if self.use_gui:
@@ -640,8 +644,8 @@ class PyBulletFrankaValidator:
         for j_idx, angle in enumerate(final_joint_angles):
             p.setJointMotorControl2(self.robot_id, j_idx, p.POSITION_CONTROL, targetPosition=angle, force=1000)
             
-        # Step simulation for 150 steps to let released object settle to rest under gravity
-        for _ in range(150):
+        # Step simulation to let released object settle to rest under gravity
+        for _ in range(self.settle_steps):
             p.stepSimulation()
             if self.use_gui:
                 time.sleep(self.sleep_time)
@@ -789,6 +793,18 @@ def main():
         help="Enable physical joint-motor control instead of kinematic joint resets."
     )
     parser.add_argument(
+        "--physics_steps",
+        type=int,
+        default=10,
+        help="Number of physics simulation steps to run for each trajectory point when --arm-physics is enabled (default: 10)."
+    )
+    parser.add_argument(
+        "--settle_steps",
+        type=int,
+        default=50,
+        help="Number of physics simulation steps to let the released object settle to rest under gravity (default: 50)."
+    )
+    parser.add_argument(
         "--self_collision_margin",
         type=float,
         default=-0.01,
@@ -857,6 +873,8 @@ def main():
         yaw_std=args.yaw_std,
         fork_mean_yaw=args.fork_mean_yaw,
         knife_mean_yaw=args.knife_mean_yaw,
+        physics_steps=args.physics_steps,
+        settle_steps=args.settle_steps,
     )
     validator.fix_knife_yaw = args.fix_knife_yaw
     validator.fix_fork_yaw = args.fix_fork_yaw
