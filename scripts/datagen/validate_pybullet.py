@@ -484,6 +484,26 @@ class PyBulletFrankaValidator:
         grasp_xy = [obj_pos[0] + world_offset_pos[0], obj_pos[1] + world_offset_pos[1]]
             
         w_grasp = np.array([grasp_xy[0], grasp_xy[1], obj_pos[2] + _GRASP_Z_OFFSET])
+        
+        # Optimize obj_yaw and target_yaw to avoid joint 7 limits (adaptive 180 degree rotation)
+        if obj_yaw is not None:
+            ee_yaw = obj_yaw + math.pi / 2.0
+            ny_ee = (ee_yaw + math.pi) % (2.0 * math.pi) - math.pi
+            rotate_180 = (ny_ee < 0.0)
+            
+            if rotate_180:
+                ny_y = (obj_yaw + math.pi) % (2.0 * math.pi) - math.pi
+                obj_yaw = ny_y - math.pi if ny_y > 0.0 else ny_y + math.pi
+            else:
+                obj_yaw = (obj_yaw + math.pi) % (2.0 * math.pi) - math.pi
+            
+            if target_yaw is not None:
+                if rotate_180:
+                    ny_y = (target_yaw + math.pi) % (2.0 * math.pi) - math.pi
+                    target_yaw = ny_y - math.pi if ny_y > 0.0 else ny_y + math.pi
+                else:
+                    target_yaw = (target_yaw + math.pi) % (2.0 * math.pi) - math.pi
+            
         w_lift = np.array([obj_pos[0], obj_pos[1], obj_pos[2] + _LIFT_Z_OFFSET])
         w_transit = np.array([target_place_pos[0], target_place_pos[1], target_place_pos[2] + _LIFT_Z_OFFSET])
         w_place = np.array([target_place_pos[0], target_place_pos[1], target_place_pos[2] + _RELEASE_Z_OFFSET])

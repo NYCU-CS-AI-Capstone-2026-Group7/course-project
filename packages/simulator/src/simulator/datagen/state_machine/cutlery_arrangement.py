@@ -200,6 +200,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._gripper_down_yaw_w: torch.Tensor | None = None
         self._gripper_down_yaw_offset_w: torch.Tensor | None = None
         self._gripper_place_yaw_offset_w: torch.Tensor | None = None
+        self._rotated_gripper_w: torch.Tensor | None = None
         self._current_object_idx: int = 0
         self._event: int = 0
         self._events_dt: list[int] = list(_PHASE_DURATIONS_PER_OBJECT) * len(_PICK_ORDER)
@@ -504,6 +505,14 @@ class CutleryArrangementStateMachine(StateMachineBase):
             # We must compute the final place quat to check arrival properly.
             target_obj_yaw = 0.0 if _PICK_ORDER[self._current_object_idx] == _FORK_NAME else math.pi
             place_yaw = target_obj_yaw + _GRASP_YAW_OFFSET + self._gripper_place_yaw_offset_w
+            # Normalize to [-pi, pi]
+            ny_place = (place_yaw + math.pi) % (2.0 * math.pi) - math.pi
+            # If the gripper target yaw is negative, rotate by 180 degrees (pi rad)
+            shifted_ny_place = torch.where(ny_place > 0.0, ny_place - math.pi, ny_place + math.pi)
+            if self._rotated_gripper_w is not None:
+                place_yaw = torch.where(self._rotated_gripper_w, shifted_ny_place, ny_place)
+            else:
+                place_yaw = torch.where(ny_place < 0.0, shifted_ny_place, ny_place)
             roll = torch.full((env.num_envs,), _GRIPPER_DOWN_ROLL_W, device=env.device, dtype=ee_quat.dtype)
             pitch = torch.full((env.num_envs,), _GRIPPER_DOWN_PITCH_W, device=env.device, dtype=ee_quat.dtype)
             final_quat_w = quat_from_euler_xyz(roll, pitch, place_yaw)
@@ -617,6 +626,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
             self._gripper_down_yaw_w = None
             self._gripper_down_yaw_offset_w = None
             self._gripper_place_yaw_offset_w = None
+            self._rotated_gripper_w = None
             self._initial_obj_pos_w = None
             self._initial_obj_quat_w = None
 
@@ -629,6 +639,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._gripper_down_yaw_w = None
         self._gripper_down_yaw_offset_w = None
         self._gripper_place_yaw_offset_w = None
+        self._rotated_gripper_w = None
         self._last_target_pos_w = None
         self._last_target_quat_w = None
         self._last_advance_with_env = False
@@ -729,16 +740,30 @@ class CutleryArrangementStateMachine(StateMachineBase):
             )
             #if obj_name == _KNIFE_NAME:
             #    base_yaw = torch.zeros_like(base_yaw) # fixed direction
-            self._gripper_down_yaw_w = (
-                base_yaw + yaw_offset + self._gripper_down_yaw_offset_w
-            ).clone()
+            raw_yaw = base_yaw + yaw_offset + self._gripper_down_yaw_offset_w
+            # Normalize to [-pi, pi]
+            ny = (raw_yaw + math.pi) % (2.0 * math.pi) - math.pi
+            # Record rotation decision: if final ee yaw is negative, we rotate by 180 degrees
+            self._rotated_gripper_w = (ny < 0.0)
+            # If the gripper target yaw is negative, rotate by 180 degrees (pi rad)
+            shifted_ny = torch.where(ny > 0.0, ny - math.pi, ny + math.pi)
+            self._gripper_down_yaw_w = torch.where(self._rotated_gripper_w, shifted_ny, ny).clone()
 
         if phase_in_cycle >= 5:
             # Generate a new place noise from normal distribution (std = 2.86 deg / 0.05 rad, clipped at +- 5.72 deg / 0.10 rad)
             self._ensure_place_yaw_offset_w(num_envs, device, dtype)
             
             target_obj_yaw = 0.0 if obj_name == _FORK_NAME else math.pi
-            place_yaw = target_obj_yaw + yaw_offset + self._gripper_place_yaw_offset_w
+            raw_place_yaw = target_obj_yaw + yaw_offset + self._gripper_place_yaw_offset_w
+            # Normalize to [-pi, pi]
+            ny_place = (raw_place_yaw + math.pi) % (2.0 * math.pi) - math.pi
+            # If the gripper target yaw is negative, rotate by 180 degrees (pi rad)
+            shifted_ny_place = torch.where(ny_place > 0.0, ny_place - math.pi, ny_place + math.pi)
+            # Apply the SAME rotation decision as the grasp phase!
+            if self._rotated_gripper_w is not None:
+                place_yaw = torch.where(self._rotated_gripper_w, shifted_ny_place, ny_place)
+            else:
+                place_yaw = torch.where(ny_place < 0.0, shifted_ny_place, ny_place)
             
             if phase_in_cycle == 5:
                 # Gradually interpolate yaw from grasp yaw to place yaw during phase 5
