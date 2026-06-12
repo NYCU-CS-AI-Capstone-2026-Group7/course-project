@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Automatically accept NVIDIA/Omniverse EULA
+export ACCEPT_EULA=Y
+export OMNI_KIT_ACCEPT_EULA=Y
+
 echo "=========================================="
 echo "   Isaac Sim & IsaacLab uv Setup Script   "
 echo "=========================================="
@@ -55,6 +59,8 @@ popd > /dev/null
 
 # 6. Install Simulator
 echo "[5/5] Installing Simulator without build-isolation..."
+# Upgrade setuptools to avoid older setuptools==65 validation bugs when compiling dependencies like evdev
+uv pip install -U setuptools
 uv pip install --no-build-isolation -e packages/simulator
 uv pip install numpy==1.26.0
 
