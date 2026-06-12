@@ -135,13 +135,13 @@ def main():
     parser.add_argument(
         "--fork_mean_yaw",
         type=float,
-        default=180.0,
+        default=0.0,
         help="Mean yaw for fork in degrees (default: 180.0, pointing away from arm).",
     )
     parser.add_argument(
         "--knife_mean_yaw",
         type=float,
-        default=0.0,
+        default=180.0,
         help="Mean yaw for knife in degrees (default: 0.0, pointing away from arm).",
     )
     parser.add_argument(

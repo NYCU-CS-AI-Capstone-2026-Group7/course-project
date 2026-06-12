@@ -302,7 +302,8 @@ class PyBulletFrankaValidator:
         )
         
         # 2. Spawn Fork (STL mesh aligned by -90deg about X-axis, scaled by 100)
-        q_align = p.getQuaternionFromEuler([-math.pi/2, 0, math.pi])
+        # Note: q_align has yaw=0.0 to match Isaac Sim mesh alignment
+        q_align = p.getQuaternionFromEuler([-math.pi/2, 0, 0.0])
         fork_stl = str(_REPO_ROOT / "packages" / "simulator" / "assets" / "scenes" / "dining_room" / "objects" / "Fork" / "fork.stl")
         fork_col = p.createCollisionShape(
             p.GEOM_MESH, 
@@ -723,14 +724,16 @@ class PyBulletFrankaValidator:
             k_yaw = 0.0
 
         # 1. Test Knife (place right)
+        # Note: target_yaw=math.pi to match Isaac Sim cutlery_arrangement.py
         k_place_pos = [_PLATE_POS[0] + 0.10, _PLATE_POS[1], _PLATE_POS[2]]
-        knife_ok = self.validate_trajectory(knife_settled_pos, k_yaw, k_place_pos, "knife", reset_joints=True)
+        knife_ok = self.validate_trajectory(knife_settled_pos, k_yaw, k_place_pos, "knife", target_yaw=math.pi, reset_joints=True)
         if not knife_ok:
             return False
 
         # 2. Test Fork (place left)
+        # Note: target_yaw=0.0 to match Isaac Sim cutlery_arrangement.py
         f_place_pos = [_PLATE_POS[0] - 0.10, _PLATE_POS[1], _PLATE_POS[2]]
-        fork_ok = self.validate_trajectory(fork_settled_pos, f_yaw, f_place_pos, "fork", target_yaw=math.pi, reset_joints=False)
+        fork_ok = self.validate_trajectory(fork_settled_pos, f_yaw, f_place_pos, "fork", target_yaw=0.0, reset_joints=False)
         return fork_ok
 
     def run_procedural_test(self, return_details=False):
@@ -866,13 +869,13 @@ def main():
     parser.add_argument(
         "--fork_mean_yaw",
         type=float,
-        default=180.0,
+        default=0.0,
         help="Mean yaw for fork in degrees (default: 180.0, pointing away from arm).",
     )
     parser.add_argument(
         "--knife_mean_yaw",
         type=float,
-        default=0.0,
+        default=180.0,
         help="Mean yaw for knife in degrees (default: 0.0, pointing away from arm).",
     )
     args = parser.parse_args()
