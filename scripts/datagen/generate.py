@@ -131,6 +131,69 @@ TASK_REGISTRY = {
 }
 
 
+# ==============================================================================
+# Monkeypatch LeRobotDatasetHandler to support resume and parallel video encoding
+# ==============================================================================
+try:
+    from leisaac.enhance.datasets.lerobot_dataset_handler import LeRobotDatasetHandler
+    
+    # 1. Fix get_num_episodes
+    def patched_get_num_episodes(self) -> int:
+        return self._lerobot_dataset.num_episodes
+    LeRobotDatasetHandler.get_num_episodes = patched_get_num_episodes
+    
+    # 2. Add safety check to clear() to prevent 'NoneType' object is not subscriptable
+    def patched_clear(self):
+        if getattr(self._lerobot_dataset, "episode_buffer", None) is not None:
+            self._lerobot_dataset.clear_episode_buffer()
+    LeRobotDatasetHandler.clear = patched_clear
+    
+    # 3. Disable parallel video encoding during flush()
+    def patched_flush(self):
+        try:
+            self._lerobot_dataset.save_episode(parallel_encoding=False)
+            print("[INFO] Successfully saved episode using sequential video encoding.")
+        except Exception as e:
+            print(f"[ERROR] Video encoding failed: {e}")
+            raise e
+    LeRobotDatasetHandler.flush = patched_flush
+    
+    # 4. Patch add_frame to override task string with current pose index
+    original_add_frame = LeRobotDatasetHandler.add_frame
+    def patched_add_frame(self, frame: dict):
+        if hasattr(self, "current_pose_idx") and self.current_pose_idx is not None:
+            frame["task"] = f"pose_idx_{self.current_pose_idx}"
+        original_add_frame(self, frame)
+    LeRobotDatasetHandler.add_frame = patched_add_frame
+    
+    # 5. Patch load_episode_poses to raise object_z to 0.08 to prevent physical penetration
+    import simulator.utils.object_poses_loader as poses_loader
+    original_load_poses = poses_loader.load_episode_poses
+
+    def patched_load_episode_poses(path, config):
+        print(f"[INFO] Adjusting object_z from {config.object_z} to 0.08 to prevent physics penetration.")
+        from simulator.utils.object_poses_loader import ObjectPoseConfig
+        new_config = ObjectPoseConfig(
+            tag_to_object=config.tag_to_object,
+            anchor_tag_id=config.anchor_tag_id,
+            anchor_world_pose=config.anchor_world_pose,
+            object_z=0.08, # Increased height to let objects drop naturally
+            object_roll=config.object_roll,
+            object_pitch=config.object_pitch,
+            per_object_yaw_offset=config.per_object_yaw_offset,
+            use_fixed_yaw=config.use_fixed_yaw,
+            ignored_object_names=config.ignored_object_names
+        )
+        return original_load_poses(path, new_config)
+
+    poses_loader.load_episode_poses = patched_load_episode_poses
+
+    print("[INFO] Successfully applied monkeypatches to LeRobotDatasetHandler and load_episode_poses")
+except Exception as e:
+    print(f"[WARNING] Failed to apply monkeypatches: {e}")
+# ==============================================================================
+
+
 class RateLimiter:
     """Convenience class for enforcing rates in loops."""
 
@@ -272,27 +335,31 @@ def _any_object_fell(env, object_names, z_threshold: float) -> bool:
     return False
 
 
+
+
+
 def _on_episode_done(
     env,
     sm,
     args_cli,
     episodes,
-    next_episode_idx,
+    current_pose_idx,
+    remaining_pose_indices,
     resume_recorded_demo_count,
     current_recorded_demo_count,
     start_record_state,
 ):
     """Handle end-of-episode logic.
 
-    Returns (next_episode_idx, current_recorded_demo_count, start_record_state, should_break).
+    Returns (next_pose_idx, current_recorded_demo_count, start_record_state, should_break, success).
     """
-    total_episodes = len(episodes)
-
     try:
         success = sm.check_success(env)
     except Exception as e:
         print("Success check failed:", e)
         success = False
+
+
 
     print("Episode success!" if success else "Episode failed!")
 
@@ -317,17 +384,21 @@ def _on_episode_done(
         )
         print(f"Recorded {current_recorded_demo_count} successful demonstrations.")
 
-    if next_episode_idx >= total_episodes:
-        print(f"Replayed all {total_episodes} episodes. Exiting the app.")
-        return next_episode_idx, current_recorded_demo_count, start_record_state, True, success
+    if not remaining_pose_indices:
+        print("Replayed all remaining episodes. Exiting the app.")
+        return None, current_recorded_demo_count, start_record_state, True, success
+
+    next_pose_idx = remaining_pose_indices.pop(0)
 
     env.reset()
     sm.reset()
     auto_terminate(env, False)
-    _apply_episode_poses(env, episodes[next_episode_idx])
-    next_episode_idx += 1
+    _apply_episode_poses(env, episodes[next_pose_idx])
 
-    return next_episode_idx, current_recorded_demo_count, start_record_state, False, success
+    if args_cli.record and hasattr(env, "recorder_manager") and hasattr(env.recorder_manager, "_dataset_file_handler"):
+        env.recorder_manager._dataset_file_handler.current_pose_idx = next_pose_idx
+
+    return next_pose_idx, current_recorded_demo_count, start_record_state, False, success
 
 
 def main():
@@ -339,6 +410,17 @@ def main():
         )
     SMClass, device = TASK_REGISTRY[task_name]
     run_seed = args_cli.seed if args_cli.seed is not None else int(time.time())
+
+    import shutil
+    real_dataset_file = args_cli.dataset_file
+    tmp_dataset_file = real_dataset_file + ".tmp"
+    failed_poses_file = real_dataset_file + "_failed.json"
+
+    if args_cli.record and not args_cli.use_lerobot_recorder:
+        if args_cli.resume and os.path.exists(real_dataset_file):
+            print(f"[INFO] Copying {real_dataset_file} to {tmp_dataset_file} for resume recording.")
+            shutil.copyfile(real_dataset_file, tmp_dataset_file)
+        args_cli.dataset_file = tmp_dataset_file
 
     output_dir = os.path.dirname(args_cli.dataset_file)
     output_file_name = os.path.splitext(os.path.basename(args_cli.dataset_file))[0]
@@ -408,7 +490,8 @@ def main():
     if args_cli.record:
         _replace_recorder_manager(env, env_cfg, args_cli)
 
-    rate_limiter = RateLimiter(args_cli.step_hz)
+    rate_limiter = None if args_cli.headless else RateLimiter(args_cli.step_hz)
+
 
     if hasattr(env, "initialize"):
         env.initialize()
@@ -427,14 +510,71 @@ def main():
         print(f"Resume recording from existing dataset file with {resume_recorded_demo_count} demonstrations.")
     current_recorded_demo_count = resume_recorded_demo_count
 
-    next_episode_idx = min(resume_recorded_demo_count, len(episodes))
-    if next_episode_idx >= len(episodes):
-        print(f"Resume count {next_episode_idx} ≥ total episodes {len(episodes)}; nothing to do.")
+    # Calculate remaining pose indices to prevent duplicate generation
+    completed_pose_indices = set()
+    if args_cli.record and args_cli.resume:
+        import glob
+        import pandas as pd
+        try:
+            repo_id = args_cli.lerobot_dataset_repo_id
+            meta_globs = [
+                f"/root/.cache/huggingface/lerobot/{repo_id}/meta/episodes/chunk-*/*.parquet",
+                f"/root/.cache/huggingface/lerobot/{repo_id}/meta/episodes.parquet"
+            ]
+            meta_files = []
+            for g in meta_globs:
+                meta_files.extend(glob.glob(g))
+            if meta_files:
+                for f in meta_files:
+                    df = pd.read_parquet(f)
+                    for col in ["tasks", "task"]:
+                        if col in df.columns:
+                            for item in df[col].tolist():
+                                if isinstance(item, str):
+                                    if item.startswith("pose_idx_"):
+                                        completed_pose_indices.add(int(item.split("_")[-1]))
+                                elif hasattr(item, "__iter__"):
+                                    for sub_item in item:
+                                        if isinstance(sub_item, str) and sub_item.startswith("pose_idx_"):
+                                            completed_pose_indices.add(int(sub_item.split("_")[-1]))
+                print(f"[INFO] Detected completed pose indices from database: {sorted(list(completed_pose_indices))}")
+        except Exception as e:
+            print(f"[WARNING] Failed to parse completed pose indices: {e}")
+
+    failed_pose_indices = []
+    if args_cli.record and args_cli.resume:
+        try:
+            if os.path.exists(failed_poses_file):
+                import json
+                with open(failed_poses_file, "r") as f:
+                    failed_pose_indices = json.load(f)
+                # Filter out poses that were successfully completed in later runs
+                failed_pose_indices = [i for i in failed_pose_indices if i not in completed_pose_indices]
+                print(f"[INFO] Loaded {len(failed_pose_indices)} failed pose indices to try later.")
+        except Exception as e:
+            print(f"[WARNING] Failed to load failed pose indices: {e}")
+
+    # Prioritize poses that have never been tried (neither success nor failed yet)
+    unused_pose_indices = [
+        i for i in range(len(episodes))
+        if i not in completed_pose_indices and i not in failed_pose_indices
+    ]
+    # Chain them: unused first, then retrying previously failed ones
+    remaining_pose_indices = unused_pose_indices + failed_pose_indices
+    print(f"[INFO] Poses remaining to generate: {len(remaining_pose_indices)} / {len(episodes)}")
+    print(f"  - Unused (Priority): {len(unused_pose_indices)}")
+    print(f"  - Previously Failed (Retry later): {len(failed_pose_indices)}")
+
+    if not remaining_pose_indices:
+        print("[INFO] All episodes already completed. Exiting.")
         env.close()
         simulation_app.close()
         return
-    _apply_episode_poses(env, episodes[next_episode_idx])
-    next_episode_idx += 1
+
+    current_pose_idx = remaining_pose_indices.pop(0)
+    _apply_episode_poses(env, episodes[current_pose_idx])
+    if args_cli.record and hasattr(env, "recorder_manager") and hasattr(env.recorder_manager, "_dataset_file_handler"):
+        env.recorder_manager._dataset_file_handler.current_pose_idx = current_pose_idx
 
     start_record_state = False
     interrupted = False
@@ -448,6 +588,7 @@ def main():
     original_sigint_handler = signal.signal(signal.SIGINT, signal_handler)
     cnt = 1
     success_ID = []
+    settling_steps = 0
     try:
         while simulation_app.is_running() and not simulation_app.is_exiting() and not interrupted:
             with torch.inference_mode():
@@ -455,30 +596,90 @@ def main():
                     dynamic_reset_gripper_effort_limit_sim(env, device)
 
                 if sm.is_episode_done:
-                    (
-                        next_episode_idx,
-                        current_recorded_demo_count,
-                        start_record_state,
-                        should_break,
-                        success,
-                    ) = _on_episode_done(
-                        env,
-                        sm,
-                        args_cli,
-                        episodes,
-                        next_episode_idx,
-                        resume_recorded_demo_count,
-                        current_recorded_demo_count,
-                        start_record_state,
-                    )
-                    if success:
-                        print(f"\033[92m[Data Usage]{cnt}/{len(episodes)} success.\033[0m")
-                        success_ID.append(cnt)
-                        cnt += 1
+                    # Only wait for 300 steps (5s) to settle if we completed all robot actions naturally (event >= 16)
+                    # If it was an early abort (event < 16), we skip settling and end immediately.
+                    need_settle = (sm._event >= len(sm._events_dt))
+                    if need_settle and settling_steps < 300:
+                        actions = sm.get_action(env)
+                        env.step(actions)
+                        settling_steps += 1
                     else:
-                        print(f"\033[91m[Data Usage]{cnt}/{len(episodes)} fail.\033[0m")
-                    if should_break:
-                        break
+                        settling_steps = 0
+                        finished_pose_idx = current_pose_idx
+                        (
+                            current_pose_idx,
+                            current_recorded_demo_count,
+                            start_record_state,
+                            should_break,
+                            success,
+                        ) = _on_episode_done(
+                            env, sm, args_cli, episodes, current_pose_idx, remaining_pose_indices,
+                            resume_recorded_demo_count, current_recorded_demo_count, start_record_state,
+                        )
+                        if success:
+                            print(f"\033[92m[Data Usage] Pose {finished_pose_idx + 1}/{len(episodes)} success. (Total Success: {current_recorded_demo_count})\033[0m")
+                            success_ID.append(cnt)
+                            cnt += 1
+                            if args_cli.record:
+                                try:
+                                    if os.path.exists(failed_poses_file):
+                                        import json
+                                        with open(failed_poses_file, "r") as f:
+                                            f_list = json.load(f)
+                                        if finished_pose_idx in f_list:
+                                            f_list.remove(finished_pose_idx)
+                                            with open(failed_poses_file, "w") as f:
+                                                json.dump(f_list, f)
+                                                print(f"[INFO] Removed Pose {finished_pose_idx} from failed list.")
+                                except Exception as err:
+                                    print(f"[WARNING] Failed to update failed list on success: {err}")
+                        else:
+                            print(f"\033[91m[Data Usage] Pose {finished_pose_idx + 1}/{len(episodes)} fail. (Total Success: {current_recorded_demo_count})\033[0m")
+                            if args_cli.record:
+                                try:
+                                    import json
+                                    f_list = []
+                                    if os.path.exists(failed_poses_file):
+                                        with open(failed_poses_file, "r") as f:
+                                            f_list = json.load(f)
+                                    if finished_pose_idx not in f_list:
+                                        f_list.append(finished_pose_idx)
+                                        with open(failed_poses_file, "w") as f:
+                                            json.dump(f_list, f)
+                                            print(f"[INFO] Added Pose {finished_pose_idx} to failed list.")
+                                except Exception as err:
+                                    print(f"[WARNING] Failed to save failed pose to file: {err}")
+
+                        # ------------------------------------------------------
+                        # Save episode progress safely (write to tmp -> rename to real)
+                        # ------------------------------------------------------
+                        if args_cli.record and not args_cli.use_lerobot_recorder:
+                            print(f"[INFO] Saving episode progress safely to {real_dataset_file}...")
+                            try:
+                                if hasattr(env.recorder_manager, "finalize"):
+                                    env.recorder_manager.finalize()
+                                if os.path.exists(tmp_dataset_file):
+                                    os.replace(tmp_dataset_file, real_dataset_file)
+                                    print(f"[INFO] Progress saved successfully.")
+                                
+                                if not should_break:
+                                    # Copy the stable file back to tmp to continue appending
+                                    shutil.copyfile(real_dataset_file, tmp_dataset_file)
+                                    # Force resume mode for next episodes
+                                    args_cli.resume = True
+                                    _configure_env_cfg(env_cfg, args_cli, is_direct_env, output_dir, output_file_name)
+                                    _replace_recorder_manager(env, env_cfg, args_cli)
+                                    if hasattr(env.recorder_manager, "_dataset_file_handler"):
+                                        env.recorder_manager._dataset_file_handler.current_pose_idx = current_pose_idx
+                                        resume_recorded_demo_count = env.recorder_manager._dataset_file_handler.get_num_episodes()
+                            except Exception as save_err:
+                                print(f"[ERROR] Failed to save episode progress: {save_err}")
+                                import traceback
+                                traceback.print_exc()
+                        # ------------------------------------------------------
+
+                        if should_break:
+                            break
                 else:
                     if not start_record_state:
                         if args_cli.record:
@@ -488,15 +689,13 @@ def main():
                     sm.pre_step(env)
                     actions = sm.get_action(env)
                     env.step(actions)
-                    sm.advance()
+                    sm.advance(env)
 
-                    if fall_check_object_names and _any_object_fell(
-                        env, fall_check_object_names, _FALL_THRESHOLD_Z
-                    ):
-                        print(
-                            "[INFO] Task object fell off the table; aborting this "
-                            "episode and skipping to next."
-                        )
+                    if hasattr(sm, "check_early_abort"):
+                        sm.check_early_abort(env)
+
+                    if fall_check_object_names and _any_object_fell(env, fall_check_object_names, _FALL_THRESHOLD_Z):
+                        print("[INFO] Task object fell off the table; aborting this episode and skipping to next.")
                         sm._episode_done = True
 
                 if rate_limiter:
@@ -511,11 +710,35 @@ def main():
         traceback.print_exc()
         print("[INFO] Cleaning up resources...")
     finally:
-        signal.signal(signal.SIGINT, original_sigint_handler)
-        if args_cli.record and hasattr(env.recorder_manager, "finalize"):
-            env.recorder_manager.finalize()
-        env.close()
-        simulation_app.close()
+        # Ignore SIGINT (Ctrl+C) during database finalization to prevent database corruption
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        try:
+            if args_cli.record and hasattr(env.recorder_manager, "finalize"):
+                print("\n[INFO] Committing database and finalizing videos to disk... Please do NOT interrupt! (Ctrl+C is temporarily disabled)")
+                try:
+                    env.recorder_manager.finalize()
+                    print("[INFO] Dataset finalized and committed successfully!")
+                    if not args_cli.use_lerobot_recorder and os.path.exists(tmp_dataset_file):
+                        os.replace(tmp_dataset_file, real_dataset_file)
+                        print(f"[INFO] Final progress saved successfully to {real_dataset_file}")
+                except Exception as finalize_err:
+                    print(f"\n[ERROR] Failed to finalize dataset: {finalize_err}")
+                    import traceback
+                    traceback.print_exc()
+        finally:
+            # Restore original SIGINT handler so user can interrupt if cleanup hangs
+            signal.signal(signal.SIGINT, original_sigint_handler)
+            
+            print("[INFO] Closing environment and simulation app...")
+            try:
+                env.close()
+            except Exception as e:
+                print(f"[WARNING] env.close() failed: {e}")
+            
+            try:
+                simulation_app.close()
+            except Exception as e:
+                print(f"[WARNING] simulation_app.close() failed: {e}")
     
     print(success_ID)
 

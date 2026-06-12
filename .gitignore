@@ -40,3 +40,5 @@ private_tasks/*
 !private_tasks/.gitkeep
 
 *.txt
+# AI related
+.antigravitycli
