@@ -144,6 +144,28 @@ def main():
         default=0.0,
         help="Mean yaw for knife in degrees (default: 0.0, pointing away from arm).",
     )
+    parser.add_argument(
+        "--physics_steps",
+        type=int,
+        default=10,
+        help="Number of physics simulation steps to run for each trajectory point when --arm-physics is enabled (default: 10).",
+    )
+    parser.add_argument(
+        "--settle_steps",
+        type=int,
+        default=50,
+        help="Number of physics simulation steps to let the released object settle to rest under gravity (default: 50).",
+    )
+    parser.add_argument(
+        "--fix_knife_yaw",
+        action="store_true",
+        help="Force the knife's grasp yaw to be zero.",
+    )
+    parser.add_argument(
+        "--fix_fork_yaw",
+        action="store_true",
+        help="Force the fork's grasp yaw to be zero.",
+    )
     args = parser.parse_args()
 
     output_path = Path(args.output)
@@ -181,7 +203,11 @@ def main():
         yaw_std=args.yaw_std,
         fork_mean_yaw=args.fork_mean_yaw,
         knife_mean_yaw=args.knife_mean_yaw,
+        physics_steps=args.physics_steps,
+        settle_steps=args.settle_steps,
     )
+    validator.fix_knife_yaw = args.fix_knife_yaw
+    validator.fix_fork_yaw = args.fix_fork_yaw
 
     episodes = []
     attempts = 0
