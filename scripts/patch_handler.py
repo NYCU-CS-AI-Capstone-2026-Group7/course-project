@@ -8,14 +8,14 @@ if not os.path.exists(target_path):
 with open(target_path, "r") as f:
     content = f.read()
 
-# Replace 1: parallel_encoding
-old_flush = "self._lerobot_dataset.save_episode(parallel_encoding=False)"
-new_flush = "self._lerobot_dataset.save_episode(parallel_encoding=True)"
+# Replace 1: parallel_encoding (force False)
+old_flush = "self._lerobot_dataset.save_episode(parallel_encoding=True)"
+new_flush = "self._lerobot_dataset.save_episode(parallel_encoding=False)"
 if old_flush in content:
     content = content.replace(old_flush, new_flush)
-    print("Successfully replaced parallel_encoding=False with True")
+    print("Successfully replaced parallel_encoding=True with False")
 else:
-    print("parallel_encoding=False not found or already replaced")
+    print("parallel_encoding=True not found or already sequential")
 
 # Replace 2: clear protection
 old_clear = """    def clear(self):
