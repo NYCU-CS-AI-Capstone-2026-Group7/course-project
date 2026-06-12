@@ -42,9 +42,10 @@ _TABLE_WIDTH = 0.65   # Y axis length
 _TABLE_CENTER_X = 0.353162
 _TABLE_CENTER_Y = -0.351832
 
-_Z_SAFE = _TABLE_SURFACE_Z + 0.20
-_Z_GRASP = _TABLE_SURFACE_Z + 0.11
-_Z_RELEASE = _TABLE_SURFACE_Z + 0.11
+_HOVER_Z_OFFSET = 0.15
+_GRASP_Z_OFFSET = 0.08
+_LIFT_Z_OFFSET = 0.22
+_RELEASE_Z_OFFSET = 0.09
 
 _MIN_SPAWN_DIST = 0.15
 
@@ -171,8 +172,8 @@ class PyBulletFrankaValidator:
             baseOrientation=[0, 0, 0, 1]
         )
         
-        # Spawn robot base at (0.35, -0.74, _TABLE_SURFACE_Z - _TABLE_HEIGHT)
-        self.robot_pos = [0.35, -0.74, _TABLE_SURFACE_Z - _TABLE_HEIGHT]
+        # Spawn robot base at (0.35, -0.74, _TABLE_SURFACE_Z - 0.0309)
+        self.robot_pos = [0.35, -0.74, _TABLE_SURFACE_Z - 0.0309]
         self.robot_quat = p.getQuaternionFromEuler([0, 0, math.pi/2])
         
         self.robot_id = p.loadURDF(
@@ -439,25 +440,40 @@ class PyBulletFrankaValidator:
                 
         return False
 
-    def validate_trajectory(self, obj_pos, obj_yaw, target_place_pos, obj_name, target_yaw=0.0):
+    def validate_trajectory(self, obj_pos, obj_yaw, target_place_pos, obj_name, target_yaw=0.0, reset_joints=True):
         """Simulates path segments and checks for self-limits and collisions."""
-        # Reset joints to rest pose
+        # 1. Obtain Franka Panda resting pose EE coordinate parameters
+        saved_joint_states = []
+        for i in range(p.getNumJoints(self.robot_id)):
+            saved_joint_states.append(p.getJointState(self.robot_id, i)[0])
+            
         for idx, angle in enumerate(_FRANKA_REST_POSE):
             p.resetJointState(self.robot_id, idx, angle)
-            p.setJointMotorControl2(self.robot_id, idx, p.VELOCITY_CONTROL, targetVelocity=0, force=0)
-        p.resetJointState(self.robot_id, 9, 0.04)
-        p.resetJointState(self.robot_id, 10, 0.04)
+        rest_ee_state = p.getLinkState(self.robot_id, self.ee_index)
+        w_rest = np.array(rest_ee_state[4])
+        rest_ee_quat = rest_ee_state[5]
+        
+        if not reset_joints:
+            # Restore saved joint states to continue seamlessly from the last object's retreat pose
+            for idx, angle in enumerate(saved_joint_states):
+                j_info = p.getJointInfo(self.robot_id, idx)
+                if j_info[2] != p.JOINT_FIXED:
+                    p.resetJointState(self.robot_id, idx, angle)
+        else:
+            # Re-initialize motor control limits for first object path start
+            for idx, angle in enumerate(_FRANKA_REST_POSE):
+                p.setJointMotorControl2(self.robot_id, idx, p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+            p.resetJointState(self.robot_id, 9, 0.04)
+            p.resetJointState(self.robot_id, 10, 0.04)
             
         current_ee_state = p.getLinkState(self.robot_id, self.ee_index)
         current_ee_pos = np.array(current_ee_state[4])
+        current_ee_quat = current_ee_state[5]
         
-        # Build Waypoints
-        w_start = current_ee_pos
-        w_hover = np.array([obj_pos[0], obj_pos[1], _Z_SAFE])
+        # Build Waypoints using dynamic height offsets mirroring the state machine
+        w_hover = np.array([obj_pos[0], obj_pos[1], obj_pos[2] + _HOVER_Z_OFFSET])
         
         # Calculate local frame offset away from the tip (towards the handle)
-        # Fork (after 180deg X-axis flip): tip points to -Y in body frame, handle to +Y. Local offset = [0.0, 0.025, 0.0]
-        # Knife (after 180deg X-axis flip): tip points to +Y in body frame, handle to -Y. Local offset = [0.0, -0.025, 0.0]
         obj_quat_xyzw = p.getQuaternionFromEuler([0.0, 0.0, obj_yaw])
         local_offset = [0.0, 0.025, 0.0] if obj_name == "fork" else [0.0, -0.025, 0.0]
         
@@ -465,24 +481,25 @@ class PyBulletFrankaValidator:
         world_offset_pos, _ = p.multiplyTransforms([0, 0, 0], obj_quat_xyzw, local_offset, [0, 0, 0, 1])
         grasp_xy = [obj_pos[0] + world_offset_pos[0], obj_pos[1] + world_offset_pos[1]]
             
-        w_grasp = np.array([grasp_xy[0], grasp_xy[1], _Z_GRASP])
-        w_lift = np.array([obj_pos[0], obj_pos[1], _Z_SAFE])
-        w_transit = np.array([target_place_pos[0], target_place_pos[1], _Z_SAFE])
-        w_place = np.array([target_place_pos[0], target_place_pos[1], _Z_RELEASE])
-        w_retreat = np.array([target_place_pos[0], target_place_pos[1], _Z_SAFE])
+        w_grasp = np.array([grasp_xy[0], grasp_xy[1], obj_pos[2] + _GRASP_Z_OFFSET])
+        w_lift = np.array([obj_pos[0], obj_pos[1], obj_pos[2] + _LIFT_Z_OFFSET])
+        w_transit = np.array([target_place_pos[0], target_place_pos[1], target_place_pos[2] + _LIFT_Z_OFFSET])
+        w_place = np.array([target_place_pos[0], target_place_pos[1], target_place_pos[2] + _RELEASE_Z_OFFSET])
+        w_retreat = np.array([target_place_pos[0], target_place_pos[1], target_place_pos[2] + _LIFT_Z_OFFSET])
         
         # Segment configuration with start and end yaws for interpolation
         segments = [
-            (w_start, w_hover, 40, False, obj_yaw, obj_yaw),
-            (w_hover, w_grasp, 30, False, obj_yaw, obj_yaw),
-            (w_grasp, w_grasp, 15, False, obj_yaw, obj_yaw),  # Wait for arm to fully settle BEFORE fingers close
-            (w_grasp, w_grasp, 15, True, obj_yaw, obj_yaw),   # Close fingers and create constraint
-            (w_grasp, w_lift, 30, True, obj_yaw, obj_yaw),
-            (w_lift, w_transit, 40, True, obj_yaw, target_yaw),
-            (w_transit, w_place, 30, True, target_yaw, target_yaw),
-            (w_place, w_place, 15, True, target_yaw, target_yaw),  # Wait for arm to settle at place pos
-            (w_place, w_place, 15, False, target_yaw, target_yaw), # Open fingers and release constraint
-            (w_place, w_retreat, 30, False, target_yaw, target_yaw)
+            (current_ee_pos, w_rest, 20, False, None, None),        # Phase 0: Move to rest joint position
+            (w_rest, w_hover, 40, False, obj_yaw, obj_yaw),         # Phase 1: Move above object (Hover)
+            (w_hover, w_grasp, 30, False, obj_yaw, obj_yaw),        # Phase 2: Approach down to object
+            (w_grasp, w_grasp, 15, False, obj_yaw, obj_yaw),        # Phase 3 Part 1: Settle before fingers close
+            (w_grasp, w_grasp, 15, True, obj_yaw, obj_yaw),         # Phase 3 Part 2: Gripper close
+            (w_grasp, w_lift, 30, True, obj_yaw, obj_yaw),          # Phase 4: Lift object upward
+            (w_lift, w_transit, 40, True, obj_yaw, target_yaw),     # Phase 5: Move above target position
+            (w_transit, w_place, 30, True, target_yaw, target_yaw), # Phase 6: Lower to release
+            (w_place, w_place, 15, True, target_yaw, target_yaw),   # Phase 7 Part 1: Settle
+            (w_place, w_place, 15, False, target_yaw, target_yaw),  # Phase 7 Part 2: Open gripper
+            (w_place, w_retreat, 30, False, target_yaw, target_yaw) # Phase 8: Retreat upward
         ]
         
         obj_body_id = self.objects[obj_name]
@@ -493,23 +510,31 @@ class PyBulletFrankaValidator:
             traj = generate_spline_trajectory(p_start, p_end, steps)
             
             # Shortest path angle interpolation for this segment
-            diff = (yaw_e - yaw_s + math.pi) % (2.0 * math.pi) - math.pi
-            yaw_traj = np.linspace(yaw_s, yaw_s + diff, steps)
+            if yaw_s is not None and yaw_e is not None:
+                diff = (yaw_e - yaw_s + math.pi) % (2.0 * math.pi) - math.pi
+                yaw_traj = np.linspace(yaw_s, yaw_s + diff, steps)
+            else:
+                yaw_traj = [0.0] * steps
             
             for step_idx, (target_pos, target_yaw_val) in enumerate(zip(traj, yaw_traj)):
+                if yaw_s is None or yaw_e is None:
+                    # Phase 0: Slerp between current EE orientation and resting orientation
+                    t_slerp = step_idx / max(1, steps - 1)
+                    target_orient = p.getQuaternionSlerp(current_ee_quat, rest_ee_quat, t_slerp)
+                else:
+                    target_orient = p.getQuaternionFromEuler([math.pi, 0, target_yaw_val + math.pi/2])
+                
                 # Solve Inverse Kinematics command
                 joint_angles = p.calculateInverseKinematics(
                     self.robot_id,
                     self.ee_index,
                     targetPosition=list(target_pos),
-                    targetOrientation=p.getQuaternionFromEuler([math.pi, 0, target_yaw_val + math.pi/2]),
+                    targetOrientation=target_orient,
                     lowerLimits=self.ik_lower_limits,
                     upperLimits=self.ik_upper_limits,
                     jointRanges=self.ik_joint_ranges,
                     restPoses=self.ik_rest_poses
                 )
-                
-
                 
                 # Apply joint angles
                 if self.arm_physics:
@@ -536,7 +561,7 @@ class PyBulletFrankaValidator:
                         if self.use_gui:
                             time.sleep(1.0 / 240.0) # Match PyBullet's internal 240Hz step for 1x real-time
                 else:
-                    # Apply joint angles kinematically (clamping to joint limits to match Isaac Sim)
+                    # Apply joint angles kinematically
                     for j_idx, angle in enumerate(joint_angles[:7]):
                         lower, upper = self.joint_limits[j_idx]
                         clamped_angle = max(lower, min(upper, angle))
@@ -550,8 +575,6 @@ class PyBulletFrankaValidator:
                 if has_grasped:
                     if grasp_constraint_id is None:
                         # Grab event! Attach the object at its actual physical relative transform.
-                        # We use pure segments to ensure the arm has physically settled BEFORE closing the fingers.
-                        # We attach the constraint to the gripper center (panda_grasptarget) to minimize lever arm error.
                         ee_state = p.getLinkState(self.robot_id, self.gripper_center_index)
                         ee_pos, ee_quat = ee_state[4], ee_state[5]
                         obj_pos_now, obj_quat_now = p.getBasePositionAndOrientation(obj_body_id)
@@ -581,7 +604,6 @@ class PyBulletFrankaValidator:
                     
                     if not self.arm_physics:
                         # Manually teleport object to match gripper exactly (kinematic tracking)
-                        # This prevents springy constraints from twisting/tilting under high IK step forces.
                         ee_state = p.getLinkState(self.robot_id, self.gripper_center_index)
                         ee_pos, ee_quat = ee_state[4], ee_state[5]
                         target_obj_pos, target_obj_quat = p.multiplyTransforms(ee_pos, ee_quat, rel_pos, rel_quat)
@@ -607,7 +629,7 @@ class PyBulletFrankaValidator:
                         p.removeConstraint(grasp_constraint_id)
                     return False
                     
-                if self.use_gui:
+                if self.use_gui and not self.arm_physics:
                     time.sleep(self.sleep_time)
                     
         if grasp_constraint_id is not None:
@@ -640,10 +662,11 @@ class PyBulletFrankaValidator:
             return False
             
         # Height check: ensure it hasn't fallen off the table
+        # Table surface is 0.50m. Threshold equivalent to -0.15m in Isaac Sim (桌面 Z 0.0409) -> 0.4591m
         pos, _ = p.getBasePositionAndOrientation(obj_body_id)
-        if pos[2] < _TABLE_SURFACE_Z - 0.01:
+        if pos[2] < 0.4591:
             if self.verbose:
-                print(f"[DEBUG] Height check failed: pos[2]={pos[2]:.4f} (table height limit={_TABLE_SURFACE_Z - 0.01:.4f})")
+                print(f"[DEBUG] Height check failed: pos[2]={pos[2]:.4f} (table height limit=0.4591m)")
             return False
             
         return True
@@ -677,13 +700,13 @@ class PyBulletFrankaValidator:
 
         # 1. Test Knife (place right)
         k_place_pos = [_PLATE_POS[0] + 0.10, _PLATE_POS[1], _PLATE_POS[2]]
-        knife_ok = self.validate_trajectory(knife_settled_pos, k_yaw, k_place_pos, "knife")
+        knife_ok = self.validate_trajectory(knife_settled_pos, k_yaw, k_place_pos, "knife", reset_joints=True)
         if not knife_ok:
             return False
 
         # 2. Test Fork (place left)
         f_place_pos = [_PLATE_POS[0] - 0.10, _PLATE_POS[1], _PLATE_POS[2]]
-        fork_ok = self.validate_trajectory(fork_settled_pos, f_yaw, f_place_pos, "fork", target_yaw=math.pi)
+        fork_ok = self.validate_trajectory(fork_settled_pos, f_yaw, f_place_pos, "fork", target_yaw=math.pi, reset_joints=False)
         return fork_ok
 
     def run_procedural_test(self, return_details=False):

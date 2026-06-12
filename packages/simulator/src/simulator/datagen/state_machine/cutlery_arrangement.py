@@ -82,18 +82,19 @@ _PLACE_X_SIGNS = (+1.0, -1.0)  # fork → +x of plate, knife → -x of plate
 _STEP_SCALE_FACTOR = 1.0
 _MAX_STEP_SCALE_FACTOR = 1.5
 _MIN_STEP_SCALE_FACTOR = 0.1
-_PHASE_DURATIONS_PER_OBJECT = tuple(int(d * _STEP_SCALE_FACTOR) for d in (270, 130, 20, 160, 255, 53, 25, 30))
+_PHASE_DURATIONS_PER_OBJECT = tuple(int(d * _STEP_SCALE_FACTOR) for d in (200, 270, 130, 20, 160, 255, 53, 25, 30))
 _PHASES_PER_OBJECT = len(_PHASE_DURATIONS_PER_OBJECT)
 
 _PHASE_NAMES = {
-    0: "Move above object (Hover)",
-    1: "Approach down to object",
-    2: "Close gripper to grasp",
-    3: "Lift object upward",
-    4: "Move above target position (beside plate)",
-    5: "Lower to release",
-    6: "Open gripper to release",
-    7: "Retreat upward"
+    0: "Move to rest joint position",
+    1: "Move above object (Hover)",
+    2: "Approach down to object",
+    3: "Close gripper to grasp",
+    4: "Lift object upward",
+    5: "Move above target position (beside plate)",
+    6: "Lower to release",
+    7: "Open gripper to release",
+    8: "Retreat upward"
 }
 
 
@@ -171,14 +172,15 @@ class CutleryArrangementStateMachine(StateMachineBase):
 
     _ph_durations = _PHASE_DURATIONS_PER_OBJECT
     _ph_timeouts = (
-        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[0]),  # Phase 0
-        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[1]),  # Phase 1
-        _ph_durations[2],                                # Phase 2
-        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[3]),  # Phase 3
-        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[4]),  # Phase 4
-        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[5]),  # Phase 5
-        _ph_durations[6],                                # Phase 6
-        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[7])   # Phase 7
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[0]),  # Phase 0 (Move to rest)
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[1]),  # Phase 1 (Hover)
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[2]),  # Phase 2 (Approach)
+        _ph_durations[3],                                # Phase 3 (Grasp, close gripper)
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[4]),  # Phase 4 (Lift)
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[5]),  # Phase 5 (Move above target)
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[6]),  # Phase 6 (Lower)
+        _ph_durations[7],                                # Phase 7 (Release, open gripper)
+        int(_MAX_STEP_SCALE_FACTOR * _ph_durations[8])   # Phase 8 (Retreat)
     )
     MAX_STEPS: int = len(_PICK_ORDER) * sum(_ph_timeouts) + 100
     EPSILON_POS: float = 0.01
@@ -193,6 +195,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         self._jacobi_joint_ids: list[int] = []
         self._rest_joint_pos: torch.Tensor | None = None
         self._rest_ee_pos_w: torch.Tensor | None = None
+        self._rest_ee_quat_w: torch.Tensor | None = None
         self._initial_ee_pos_w: torch.Tensor | None = None
         self._gripper_down_yaw_w: torch.Tensor | None = None
         self._gripper_down_yaw_offset_w: torch.Tensor | None = None
@@ -240,6 +243,7 @@ class CutleryArrangementStateMachine(StateMachineBase):
         env.sim.step(render=False)
         env.scene.update(dt=env.physics_dt)
         self._rest_ee_pos_w = self._ee_pos_w(robot).clone()
+        self._rest_ee_quat_w = self._ee_quat_w(robot).clone()
 
     def _get_yaw(self, quat_tensor: torch.Tensor) -> float:
         """Extract yaw from a single quaternion (w, x, y, z) tensor."""
@@ -265,9 +269,9 @@ class CutleryArrangementStateMachine(StateMachineBase):
         if self._step_count != 0:
             return False
 
-        # event == 4 is right after knife lift phase; event == 12 is right after fork lift phase
-        if self._event in (4, 12):
-            target_obj = "knife" if self._event == 4 else "fork"
+        # event == 5 is right after knife lift phase; event == 14 is right after fork lift phase
+        if self._event in (5, 14):
+            target_obj = "knife" if self._event == 5 else "fork"
             # Get object Z relative to env origin
             obj_z = env.scene[target_obj].data.root_pos_w[0, 2].item() - env.scene.env_origins[0, 2].item()
             if obj_z < 0.08:  # Normal lifted height is ~0.20+, if < 0.08 it means grasp failed
@@ -276,8 +280,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
                 return True
             return False
 
-        # 1. Knife placed (event 8, step 0): check knife yaw
-        if self._event == 8:
+        # 1. Knife placed (event 10, step 0): check knife yaw after move to rest phase
+        if self._event == 10:
             k_ok, k_yaw, k_diff_deg = self._check_cutlery_yaw_mismatch(env, "knife", math.pi)
             if not k_ok:
                 print(f"[INFO] Early abort: Knife yaw mismatch (yaw={math.degrees(k_yaw):.1f}° | diff={k_diff_deg:.1f}° > 15.0°).")
@@ -285,12 +289,12 @@ class CutleryArrangementStateMachine(StateMachineBase):
                 return True
             return False
 
-        # 2. Fork placed (event 16, step 0): check fork yaw
-        if self._event == 16:
+        # 2. Fork placed (event 18, step 0): check fork yaw
+        if self._event == 18:
             f_ok, f_yaw, f_diff_deg = self._check_cutlery_yaw_mismatch(env, "fork", 0.0)
             if not f_ok:
                 print(f"[INFO] Early abort: Fork yaw mismatch (yaw={math.degrees(f_yaw):.1f}° | diff={f_diff_deg:.1f}° > 15.0°).")
-                self._event = 15  # Set back to 15 so we skip the 300-step settle and end immediately
+                self._event = 17  # Set back to 17 so we skip the 300-step settle and end immediately
                 self._episode_done = True
                 return True
             return False
@@ -365,17 +369,20 @@ class CutleryArrangementStateMachine(StateMachineBase):
 
         phase_in_cycle = self._event % _PHASES_PER_OBJECT
 
-        target_quat_w = self._gripper_down_quat_w(
-            obj_quat_w_ref,
-            obj_name,
-            num_envs,
-            device,
-            obj_quat_w_ref.dtype,
-            yaw_offset=_GRASP_YAW_OFFSET,
-            phase_in_cycle=phase_in_cycle,
-        )
+        if phase_in_cycle == 0:
+            target_quat_w = self._rest_ee_quat_w.clone()
+        else:
+            target_quat_w = self._gripper_down_quat_w(
+                obj_quat_w_ref,
+                obj_name,
+                num_envs,
+                device,
+                obj_quat_w_ref.dtype,
+                yaw_offset=_GRASP_YAW_OFFSET,
+                phase_in_cycle=phase_in_cycle,
+            )
 
-        if phase_in_cycle >= 3:
+        if phase_in_cycle >= 4:
             self._ensure_place_yaw_offset_w(num_envs, device, obj_pos_w_ref.dtype)
 
         # Calculate local frame offset away from the tip (towards the handle)
@@ -397,14 +404,15 @@ class CutleryArrangementStateMachine(StateMachineBase):
         grasp_anchor_w[:, :2] += world_offset[:, :2]
 
         phase_handlers = {
-            0: (self._phase_move_above_object, obj_pos_w_ref),
-            1: (self._phase_approach_object, grasp_anchor_w),
-            2: (self._phase_grasp, grasp_anchor_w),
-            3: (self._phase_lift, obj_pos_w_ref),
-            4: (self._phase_move_above_place, place_target_w),
-            5: (self._phase_lower_to_release, place_target_w),
-            6: (self._phase_open_gripper, place_target_w),
-            7: (self._phase_retreat, place_target_w),
+            0: (self._phase_move_to_rest, None),
+            1: (self._phase_move_above_object, obj_pos_w_ref),
+            2: (self._phase_approach_object, grasp_anchor_w),
+            3: (self._phase_grasp, grasp_anchor_w),
+            4: (self._phase_lift, obj_pos_w_ref),
+            5: (self._phase_move_above_place, place_target_w),
+            6: (self._phase_lower_to_release, place_target_w),
+            7: (self._phase_open_gripper, place_target_w),
+            8: (self._phase_retreat, place_target_w),
         }
 
         handler, arg = phase_handlers[phase_in_cycle]
@@ -418,6 +426,9 @@ class CutleryArrangementStateMachine(StateMachineBase):
     # ------------------------------------------------------------------
     # Phase helpers
     # ------------------------------------------------------------------
+
+    def _phase_move_to_rest(self, dummy, num_envs, device):
+        return self._rest_ee_pos_w.clone(), _constant_gripper(num_envs, device, _GRIPPER_OPEN)
 
     def _phase_move_above_object(self, obj_pos_w, num_envs, device):
         target = obj_pos_w.clone()
@@ -488,8 +499,8 @@ class CutleryArrangementStateMachine(StateMachineBase):
         
         # Rotation error: Angle between quaternions in radians
         phase_in_cycle = self._event % _PHASES_PER_OBJECT
-        if phase_in_cycle == 4:
-            # In Phase 4, _last_target_quat_w is interpolating, so it's not the final destination.
+        if phase_in_cycle == 5:
+            # In Phase 5, _last_target_quat_w is interpolating, so it's not the final destination.
             # We must compute the final place quat to check arrival properly.
             target_obj_yaw = 0.0 if _PICK_ORDER[self._current_object_idx] == _FORK_NAME else math.pi
             place_yaw = target_obj_yaw + _GRASP_YAW_OFFSET + self._gripper_place_yaw_offset_w
@@ -508,12 +519,12 @@ class CutleryArrangementStateMachine(StateMachineBase):
         epsilon_pos = self.EPSILON_POS
         epsilon_rot = self.EPSILON_ROT
         
-        if phase_in_cycle == 1:
+        if phase_in_cycle == 2:
             # 2.2: Approach down to object
             # Relax position tolerance slightly to 0.045m to handle table contact early and avoid stuck timeouts
             epsilon_pos = 0.045
-        elif phase_in_cycle == 7:
-            # Phase 7: Retreat upward
+        elif phase_in_cycle == 8:
+            # Phase 8: Retreat upward
             # Relax rotation tolerance since it is just an empty gripper retreating
             epsilon_rot = 0.8
             
@@ -571,13 +582,13 @@ class CutleryArrangementStateMachine(StateMachineBase):
         default_duration = self._events_dt[self._event]
         
         # Purely time-based open-loop durations
-        if phase_in_cycle in (2, 6):
+        if phase_in_cycle in (3, 7):
             if self._step_count < default_duration:
                 return
             self._advance_to_next_event()
             return
 
-        # Movement phases: 0, 1, 3, 4, 5, 7
+        # Movement phases: 0, 1, 2, 4, 5, 6, 8
         arrived = self.check_arrival(env).all()
         min_steps = max(10, int(_MIN_STEP_SCALE_FACTOR * default_duration))
         max_steps = int(_MAX_STEP_SCALE_FACTOR * default_duration)
@@ -722,15 +733,15 @@ class CutleryArrangementStateMachine(StateMachineBase):
                 base_yaw + yaw_offset + self._gripper_down_yaw_offset_w
             ).clone()
 
-        if phase_in_cycle >= 4:
+        if phase_in_cycle >= 5:
             # Generate a new place noise from normal distribution (std = 2.86 deg / 0.05 rad, clipped at +- 5.72 deg / 0.10 rad)
             self._ensure_place_yaw_offset_w(num_envs, device, dtype)
             
             target_obj_yaw = 0.0 if obj_name == _FORK_NAME else math.pi
             place_yaw = target_obj_yaw + yaw_offset + self._gripper_place_yaw_offset_w
             
-            if phase_in_cycle == 4:
-                # Gradually interpolate yaw from grasp yaw to place yaw during phase 4
+            if phase_in_cycle == 5:
+                # Gradually interpolate yaw from grasp yaw to place yaw during phase 5
                 grasp_yaw = self._gripper_down_yaw_w.to(device=device, dtype=dtype)
                 
                 denom = max(self._events_dt[self._event] - 1, 1)
