@@ -2,10 +2,10 @@
 
 # 基礎路徑與 Repo 設定
 BASE_DIR=~/.cache/huggingface/lerobot/XiaoPanPanKevinPan
-REPO_PREFIX="XiaoPanPanKevinPan/aicapstone_group7_cutlery_v2_replay"
+REPO_PREFIX="XiaoPanPanKevinPan/g7_cutlery_v3_replay"
 
 # 定義要追蹤的後綴 (包含原始的、_2、_3)
-TARGETS=("" "_2" "_3")
+TARGETS=("_0" "_1" "_2" "_3" "_4" "_5" "_6" "_7")
 
 # Parse arguments
 OVERWRITE_REMOTE=false
