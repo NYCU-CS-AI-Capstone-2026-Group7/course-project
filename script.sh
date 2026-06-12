@@ -8,7 +8,7 @@ python scripts/datagen/generate.py \
     --enable_cameras \
     --record \
     --use_lerobot_recorder \
-    --lerobot_dataset_repo_id fanyi000/cultery_synth \
+    --lerobot_dataset_repo_id ${HF_USER}/cultery_synth \
     --augment_pose_factor 10 \
     --augment_global_xy_jitter 0.01 \
     --augment_local_xy_jitter 0.05 \
@@ -23,7 +23,7 @@ python scripts/datagen/generate.py \
     --enable_cameras \
     --record \
     --use_lerobot_recorder \
-    --lerobot_dataset_repo_id fanyi000/cultery_synth \
+    --lerobot_dataset_repo_id ${HF_USER}/cultery_synth \
     --augment_pose_factor 10 \
     --augment_global_xy_jitter 0.01 \
     --augment_local_xy_jitter 0.05 \
@@ -52,12 +52,12 @@ HF_HUB_DISABLE_XET=1 lerobot-train \
   --policy.repo_id=${HF_USER}/my_policy_act
 
 # evaluation
-hf download fanyi000/my_policy_diffusion --local-dir outputs/diffusion_v3
+hf download ${HF_USER}/my_policy_diffusion --local-dir outputs/diffusion
 make launch-isaaclab-glowsai-l40s
 python scripts/rollout.py \
     --task=eval/cutlery_arrangement_eval.py \
     --policy_type=lerobot-diffusion \
-    --policy_checkpoint_path=outputs/diffusion_v3 \
+    --policy_checkpoint_path=outputs/diffusion \
     --policy_action_horizon=8 \
     --device=cuda \
     --headless \
