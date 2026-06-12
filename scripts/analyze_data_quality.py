@@ -21,7 +21,6 @@ EVAL_JITTER         = 0.05
 ROBOT_BASE          = (0.35, -0.74)
 R_MAX_H             = 0.845   # Franka horizontal reach at grasp height
 R_MIN_H             = 0.20
-Y_TABLE_MAX         = 0.0     # empirical table edge
 
 DATA_DIR = Path(__file__).parent.parent / "data" / "AI-final-49"
 OUT_DIR  = Path(__file__).parent.parent / "data" / "figures"
@@ -33,7 +32,7 @@ def to_world(tvec):
 
 def in_workspace(wx, wy):
     d = math.sqrt((wx - ROBOT_BASE[0])**2 + (wy - ROBOT_BASE[1])**2)
-    return R_MIN_H <= d <= R_MAX_H and wy <= Y_TABLE_MAX
+    return R_MIN_H <= d <= R_MAX_H
 
 def load_positions(path):
     with open(path) as f:
@@ -51,11 +50,9 @@ def load_positions(path):
         result.append({"positions": pos, "source": source})
     return result
 
-def workspace_arc(cx, cy, r, y_max, n=360):
+def workspace_arc(cx, cy, r, n=360):
     thetas = np.linspace(0, 2 * math.pi, n)
-    xs = cx + r * np.cos(thetas)
-    ys = np.minimum(cy + r * np.sin(thetas), y_max)
-    return xs, ys
+    return cx + r * np.cos(thetas), cy + r * np.sin(thetas)
 
 # ── Figure 1: Data pipeline ──────────────────────────────────────────────────
 def fig_pipeline():
@@ -107,13 +104,12 @@ def fig_spatial_coverage():
 
     fig, ax = plt.subplots(figsize=(7, 7))
 
-    # workspace boundary (annulus clipped to table)
-    ox, oy = workspace_arc(*ROBOT_BASE, R_MAX_H, Y_TABLE_MAX)
-    ix, iy = workspace_arc(*ROBOT_BASE, R_MIN_H, Y_TABLE_MAX)
+    # workspace boundary (annulus)
+    ox, oy = workspace_arc(*ROBOT_BASE, R_MAX_H)
+    ix, iy = workspace_arc(*ROBOT_BASE, R_MIN_H)
     ax.fill(ox, oy, color="#e3f2fd", alpha=0.5, zorder=0)
     ax.plot(ox, oy, color="#1565C0", lw=1.5, linestyle="--", label="Franka workspace boundary")
     ax.fill(ix, iy, color="white",   alpha=1.0, zorder=1)
-    ax.axhline(Y_TABLE_MAX, color="#c62828", lw=1.5, linestyle=":", label="Table edge (y=0)")
 
     # eval range boxes
     for label, (dx, dy), col in [("Eval range — fork",  (0.55, -0.10), "#2196F3"),
@@ -134,7 +130,6 @@ def fig_spatial_coverage():
     # manual legend below the plot
     legend_elements = [
         plt.Line2D([0],[0], color="#1565C0", lw=1.5, linestyle="--", label="Franka workspace boundary"),
-        plt.Line2D([0],[0], color="#c62828", lw=1.5, linestyle=":",  label="Table edge (y=0)"),
         plt.scatter([],[],  c="#1565C0", s=55, marker="^",           label=f"Fork — real UMI (n={len(fork_real_x)})"),
         plt.scatter([],[],  c="#90CAF9", s=30, marker="^",           label=f"Fork — synthetic (n={len(fork_syn_x)})"),
         plt.scatter([],[],  c="#BF360C", s=55, marker="s",           label=f"Knife — real UMI (n={len(knife_real_x)})"),
@@ -181,12 +176,11 @@ def fig_umi_filtering():
     fig, ax = plt.subplots(figsize=(7, 7))
 
     # workspace (annulus)
-    ox, oy = workspace_arc(*ROBOT_BASE, R_MAX_H, Y_TABLE_MAX)
-    ix, iy = workspace_arc(*ROBOT_BASE, R_MIN_H, Y_TABLE_MAX)
+    ox, oy = workspace_arc(*ROBOT_BASE, R_MAX_H)
+    ix, iy = workspace_arc(*ROBOT_BASE, R_MIN_H)
     ax.fill(ox, oy, color="#e8f5e9", alpha=0.4, zorder=0)
     ax.plot(ox, oy, color="#2e7d32", lw=2, linestyle="--", label="Franka workspace boundary")
     ax.fill(ix, iy, color="white", alpha=1.0, zorder=1)
-    ax.axhline(Y_TABLE_MAX, color="#c62828", lw=1.5, linestyle=":", label="Table edge (y=0)")
 
     if invalid_f:
         ax.scatter(*zip(*invalid_f), c="#ef9a9a", s=50, marker="^", alpha=0.75, zorder=3)
@@ -203,7 +197,6 @@ def fig_umi_filtering():
     nv = len(set(map(id, valid_f)))   # approx per-episode count
     legend_elements = [
         plt.Line2D([0],[0], color="#2e7d32", lw=2, linestyle="--", label="Franka workspace boundary"),
-        plt.Line2D([0],[0], color="#c62828", lw=1.5, linestyle=":", label="Table edge (y=0)"),
         plt.scatter([],[],  c="#1b5e20", s=65, marker="^", label=f"Fork — valid ({len(valid_f)})"),
         plt.scatter([],[],  c="#1b5e20", s=65, marker="s", label=f"Knife — valid ({len(valid_k)})"),
         plt.scatter([],[],  c="#ef9a9a", s=50, marker="^", label=f"Fork — discarded ({len(invalid_f)})"),

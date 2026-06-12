@@ -136,7 +136,7 @@ launch-isaaclab-glowsai-4090: build-isaaclab
 			exec /bin/bash \
 		'
 
-# ---- Launch: GlowsAI L40S (VirtualGL + VNC display :1) -----------------------
+# ---- Launch: GlowsAI L40S (VirtualGL + VNC display :2) -----------------------
 launch-isaaclab-glowsai-l40s: build-isaaclab
 	@set -e; \
 	docker run --rm -it \

@@ -49,7 +49,7 @@ R_MAX_H = math.sqrt(max(FRANKA_MAX_REACH**2 - Z_DIFF**2, 0))
 R_MIN_H = FRANKA_MIN_REACH          # inner bound stays roughly constant
 
 # Table boundary (observed from datagen failures: objects at y > 0 fell off)
-TABLE_Y_MAX = 0.00
+TABLE_Y_MAX = None  # not used — table edge removed from figure
 TABLE_Y_MIN = -0.70
 TABLE_X_MIN = -0.10
 TABLE_X_MAX =  1.00
@@ -80,16 +80,11 @@ def load_positions(path):
     return out
 
 # ── workspace polygon (annulus clipped to table) ─────────────────────────────
-def workspace_polygon(cx, cy, r_max, r_min, y_max, n=360):
-    """Outer and inner boundary of the workspace polygon."""
+def workspace_polygon(cx, cy, r_max, r_min, n=360):
     thetas = np.linspace(0, 2 * math.pi, n)
-    outer, inner = [], []
-    for t in thetas:
-        xo, yo = cx + r_max * math.cos(t), cy + r_max * math.sin(t)
-        xi, yi = cx + r_min * math.cos(t), cy + r_min * math.sin(t)
-        outer.append((xo, min(yo, y_max)))
-        inner.append((xi, min(yi, y_max)))
-    return np.array(outer), np.array(inner)
+    outer = np.array([(cx + r_max * math.cos(t), cy + r_max * math.sin(t)) for t in thetas])
+    inner = np.array([(cx + r_min * math.cos(t), cy + r_min * math.sin(t)) for t in thetas])
+    return outer, inner
 
 # ── figure ────────────────────────────────────────────────────────────────────
 def fig_workspace():
@@ -99,7 +94,7 @@ def fig_workspace():
 
     # ── reachable workspace ──────────────────────────────────────────────────
     cx, cy = ROBOT_BASE_XY
-    outer, inner = workspace_polygon(cx, cy, R_MAX_H, R_MIN_H, TABLE_Y_MAX)
+    outer, inner = workspace_polygon(cx, cy, R_MAX_H, R_MIN_H)
 
     # fill outer circle (clipped to table)
     ax.fill(outer[:, 0], outer[:, 1], color="#b3e5fc", alpha=0.4, label=f"Reachable workspace (r≤{R_MAX_H:.2f} m, z={GRASP_Z} m)")
@@ -107,10 +102,6 @@ def fig_workspace():
     # subtract inner dead zone
     ax.fill(inner[:, 0], inner[:, 1], color="white", alpha=1.0)
     ax.plot(inner[:, 0], inner[:, 1], color="#0288d1", lw=1, linestyle=":")
-
-    # ── table boundary ───────────────────────────────────────────────────────
-    ax.axhline(TABLE_Y_MAX, color="#c62828", lw=2, linestyle="--",
-               label=f"Table edge (y={TABLE_Y_MAX}, observed from failures)")
 
     # ── training data ────────────────────────────────────────────────────────
     for ep in episodes:
@@ -140,8 +131,6 @@ def fig_workspace():
                    label=f"Reachable workspace (r≤{R_MAX_H:.2f} m at z={GRASP_Z} m)"),
         plt.Line2D([0],[0], color="#0288d1", lw=1, linestyle=":",
                    label="Dead zone boundary (r<0.20 m)"),
-        plt.Line2D([0],[0], color="#c62828", lw=2, linestyle="--",
-                   label="Table edge (y=0, empirical)"),
         plt.scatter([],[],  c="#1565C0", s=70, marker="^", label="Fork — real UMI"),
         plt.scatter([],[],  c="#64B5F6", s=35, marker="^", label="Fork — synthetic"),
         plt.scatter([],[],  c="#BF360C", s=70, marker="s", label="Knife — real UMI"),

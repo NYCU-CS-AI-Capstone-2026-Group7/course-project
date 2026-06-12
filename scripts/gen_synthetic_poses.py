@@ -22,7 +22,6 @@ ANCHOR_X, ANCHOR_Y = 0.40, 0.10
 PLATE_POS = (0.50, -0.40)
 ROBOT_BASE = (0.35, -0.74)
 R_MAX, R_MIN = 0.845, 0.20   # Franka horizontal reach at grasp height
-Y_MAX_TABLE = -0.02          # table edge observed from datagen failures
 
 MIN_FORK_KNIFE_DIST = 0.08   # keep them ≥8 cm apart
 MIN_PLATE_DIST = 0.12        # keep each object ≥12 cm from plate
@@ -34,7 +33,7 @@ def _dist(a, b):
 
 def _in_workspace(x, y):
     d = math.sqrt((x - ROBOT_BASE[0])**2 + (y - ROBOT_BASE[1])**2)
-    return R_MIN <= d <= R_MAX and y <= Y_MAX_TABLE
+    return R_MIN <= d <= R_MAX
 
 
 def generate_synthetic(n: int, seed: int) -> list[dict]:
@@ -47,11 +46,10 @@ def generate_synthetic(n: int, seed: int) -> list[dict]:
             print(f"[WARN] Only generated {len(episodes)}/{n} episodes after {attempts} attempts")
             break
 
-        # sample within a bounding box, then check actual workspace
         fx = rng.uniform(ROBOT_BASE[0] - R_MAX, ROBOT_BASE[0] + R_MAX)
-        fy = rng.uniform(ROBOT_BASE[1] - R_MAX, Y_MAX_TABLE)
+        fy = rng.uniform(ROBOT_BASE[1] - R_MAX, ROBOT_BASE[1] + R_MAX)
         kx = rng.uniform(ROBOT_BASE[0] - R_MAX, ROBOT_BASE[0] + R_MAX)
-        ky = rng.uniform(ROBOT_BASE[1] - R_MAX, Y_MAX_TABLE)
+        ky = rng.uniform(ROBOT_BASE[1] - R_MAX, ROBOT_BASE[1] + R_MAX)
 
         if not _in_workspace(fx, fy) or not _in_workspace(kx, ky):
             continue
